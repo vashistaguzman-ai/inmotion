@@ -1,0 +1,1717 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>In Motion</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Instrument+Serif:ital@0;1&family=JetBrains+Mono:wght@400;600;700&display=swap">
+<style>
+:root{--bg:#07090D;--panel:#0E131B;--panel2:#141B26;--line:#223044;--ink:#E8EEF5;--muted:#93A3B8;color-scheme:dark}
+html,body{background:#07090D;color:#E8EEF5;margin:0}
+body{font-family:'Instrument Sans',system-ui,sans-serif}
+.cap-in{animation:capIn .28s ease-out}
+.pop-in{animation:popIn .18s ease-out}
+@keyframes capIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+@keyframes popIn{from{opacity:0;transform:scale(.97)}to{opacity:1;transform:none}}
+@media (prefers-reduced-motion: reduce){.cap-in,.pop-in{animation:none}}
+input[type=range]{height:28px}
+#boot{padding:32px;font-family:system-ui,sans-serif;color:#93A3B8}
+</style>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config={theme:{extend:{colors:{bg:'#07090D',panel:'#0E131B',panel2:'#141B26',line:'#223044',ink:'#E8EEF5',muted:'#93A3B8',cyan:'#45E0D6',amber:'#FFB547',rose:'#FF6B9A',ok:'#6EE7A0',bad:'#FF6B6B'},fontFamily:{sans:['Instrument Sans','system-ui','sans-serif'],display:['Instrument Serif','Georgia','serif'],mono:['JetBrains Mono','ui-monospace','monospace']}}}};
+</script>
+<div id="root"><p id="boot">Loading the interactive video…</p></div>
+<script src="https://cdn.jsdelivr.net/npm/react@18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/react-dom@18.3.1/umd/react-dom.production.min.js"></script>
+<script>window.react = window.React;</script>
+<script src="https://cdn.jsdelivr.net/npm/lucide-react@0.460.0/dist/umd/lucide-react.min.js"></script>
+<script>
+if (!window.React || !window.ReactDOM) { document.getElementById('boot').textContent = 'The player library could not load. Check your connection and reload the page.'; } else {
+/* ================= Physics models, data and default narration ================= */
+const W = 1280, H = 720;
+const clamp = (v, a, b) => Math.max(a, Math.min(b, v));
+const lerp = (a, b, t) => a + (b - a) * t;
+const ease = t => t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2;
+const seg = (p, a, b) => clamp((p - a) / (b - a), 0, 1);
+function rnd(i, s) { const x = Math.sin((i + 1) * 12.9898 + (s || 0) * 78.233) * 43758.5453; return x - Math.floor(x); }
+function gauss(i, s) { const u = Math.max(1e-6, rnd(i, s)), v = rnd(i + 999, s); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); }
+const fmt = (v, d) => (v === undefined || v === null || !isFinite(v)) ? '—' : Number(v).toFixed(d === undefined ? 1 : d);
+
+/* ---------- XPS ---------- */
+const XPS_SOURCES = [
+  { id: 'alka', label: 'Al Kα', hv: 1486.6 },
+  { id: 'mgka', label: 'Mg Kα', hv: 1253.6 },
+  { id: 'custom', label: 'Custom', hv: null }
+];
+const XPS_ELEMENTS = {
+  C: { name: 'Carbon', Z: 6, levels: [{ l: 'C 1s', be: 284.8, r: 1, shell: 1 }] },
+  N: { name: 'Nitrogen', Z: 7, levels: [{ l: 'N 1s', be: 399.0, r: 1, shell: 1 }] },
+  O: { name: 'Oxygen', Z: 8, levels: [{ l: 'O 1s', be: 531.0, r: 1, shell: 1 }, { l: 'O 2s', be: 23.0, r: 0.08, shell: 2 }] },
+  Al: { name: 'Aluminium', Z: 13, levels: [{ l: 'Al 2p', be: 72.9, r: 1, shell: 2 }, { l: 'Al 2s', be: 117.9, r: 0.8, shell: 2 }] },
+  Si: { name: 'Silicon', Z: 14, levels: [{ l: 'Si 2p', be: 99.4, r: 1, shell: 2 }, { l: 'Si 2s', be: 150.5, r: 0.85, shell: 2 }] },
+  Ti: { name: 'Titanium', Z: 22, levels: [{ l: 'Ti 2p3/2', be: 453.9, r: 1, shell: 2 }, { l: 'Ti 2p1/2', be: 460.0, r: 0.5, shell: 2 }, { l: 'Ti 2s', be: 560.9, r: 0.25, shell: 2 }, { l: 'Ti 3p', be: 32.6, r: 0.15, shell: 3 }] },
+  Fe: { name: 'Iron', Z: 26, levels: [{ l: 'Fe 2p3/2', be: 706.8, r: 1, shell: 2 }, { l: 'Fe 2p1/2', be: 719.9, r: 0.5, shell: 2 }, { l: 'Fe 3s', be: 91.3, r: 0.08, shell: 3 }, { l: 'Fe 3p', be: 52.7, r: 0.12, shell: 3 }] },
+  Cu: { name: 'Copper', Z: 29, levels: [{ l: 'Cu 2p3/2', be: 932.7, r: 1, shell: 2 }, { l: 'Cu 2p1/2', be: 952.5, r: 0.5, shell: 2 }, { l: 'Cu 3s', be: 122.5, r: 0.07, shell: 3 }, { l: 'Cu 3p', be: 75.1, r: 0.12, shell: 3 }] },
+  Ag: { name: 'Silver', Z: 47, levels: [{ l: 'Ag 3d5/2', be: 368.3, r: 1, shell: 3 }, { l: 'Ag 3d3/2', be: 374.3, r: 0.67, shell: 3 }, { l: 'Ag 3p3/2', be: 573.0, r: 0.25, shell: 3 }] },
+  Au: { name: 'Gold', Z: 79, levels: [{ l: 'Au 4f7/2', be: 84.0, r: 1, shell: 4 }, { l: 'Au 4f5/2', be: 87.7, r: 0.75, shell: 4 }, { l: 'Au 4d5/2', be: 335.1, r: 0.45, shell: 4 }, { l: 'Au 4p3/2', be: 546.3, r: 0.15, shell: 4 }] }
+};
+const XPS_DEFAULT = { source: 'alka', customHv: 1000, element: 'C', phi: 4.5 };
+function xpsDerived(pr) {
+  const src = XPS_SOURCES.find(s => s.id === pr.source) || XPS_SOURCES[0];
+  const hv = src.hv || clamp(Number(pr.customHv) || 0, 50, 2000);
+  const el = XPS_ELEMENTS[pr.element] || XPS_ELEMENTS.C; const phi = clamp(Number(pr.phi) || 4.5, 2, 7);
+  const levels = el.levels.map(L => Object.assign({}, L, { ke: hv - L.be - phi, ok: hv - L.be - phi > 0 }));
+  const main = levels.filter(L => L.ok).sort((a, b) => b.r - a.r)[0] || null;
+  const target = main || levels.slice().sort((a, b) => b.r - a.r)[0];
+  const ke = main ? main.ke : 0;
+  return {
+    hv, phi, el, levels, main, target, ke, threshold: !main,
+    srcLabel: src.hv ? src.label : 'Custom ' + fmt(hv, 0) + ' eV',
+    lambdaNm: 1239.84 / hv,
+    v: main ? 5.931e5 * Math.sqrt(ke) : 0,
+    deBroglieA: main ? 12.264 / Math.sqrt(ke) : 0,
+    imfpNm: main ? clamp(0.25 * (538 / (ke * ke) + 0.41 * Math.sqrt(0.25 * ke)), 0.3, 6) : 0,
+    speedVis: main ? clamp(Math.sqrt(ke / 1200), 0.18, 1.35) : 0
+  };
+}
+function xpsSpectrum(d) {
+  const maxBE = Math.min(d.hv - d.phi, 1100); if (maxBE <= 5) return { xs: [], ys: [], maxBE: 0, peaks: [], maxY: 1 };
+  const n = Math.max(520, Math.round(maxBE * 1.2)); const xs = [], ys = [];
+  const peaks = d.levels.filter(L => L.ok && L.be < maxBE);
+  for (let i = 0; i < n; i++) {
+    const be = maxBE * i / (n - 1); let y = 60 + 0.08 * be;
+    peaks.forEach(L => {
+      const A = 2400 * L.r * (0.6 + d.el.Z / 60); const s = 1.4 + (L.be > 500 ? 0.6 : 0);
+      y += A * Math.exp(-0.5 * Math.pow((be - L.be) / s, 2)) + A * 0.035 * (1 / (1 + Math.exp(-(be - L.be) / 1.5)));
+    });
+    ys.push(Math.max(0, y + Math.sqrt(y) * 0.9 * gauss(i, 7))); xs.push(be);
+  }
+  return { xs, ys, maxBE, peaks, maxY: Math.max.apply(null, ys) * 1.08 };
+}
+
+/* ---------- EELS ---------- */
+const EELS_SOURCES = [
+  { id: 'w', label: 'W hairpin (thermionic)', fwhm: 2.2, temp: 2700, thermionic: true },
+  { id: 'lab6', label: 'LaB₆ (thermionic)', fwhm: 1.5, temp: 1800, thermionic: true },
+  { id: 'sfeg', label: 'Schottky FEG', fwhm: 0.7, temp: 1800, thermionic: false },
+  { id: 'cfeg', label: 'Cold FEG', fwhm: 0.35, temp: 300, thermionic: false }
+];
+const EELS_ELEMENTS = {
+  B: { name: 'Boron', edge: 'B K', e0: 188, ep: 23 },
+  C: { name: 'Carbon (amorphous)', edge: 'C K', e0: 284, ep: 25 },
+  N: { name: 'Nitrogen (in BN)', edge: 'N K', e0: 401, ep: 25 },
+  O: { name: 'Oxygen (in an oxide)', edge: 'O K', e0: 532, ep: 23 },
+  Al: { name: 'Aluminium', edge: 'Al L₂,₃', e0: 73, ep: 15.0 },
+  Si: { name: 'Silicon', edge: 'Si L₂,₃', e0: 99, ep: 16.7 },
+  Ti: { name: 'Titanium', edge: 'Ti L₂,₃', e0: 456, ep: 17.5, wl: 5.7 },
+  Fe: { name: 'Iron', edge: 'Fe L₂,₃', e0: 708, ep: 23, wl: 13.1 },
+  Cu: { name: 'Copper', edge: 'Cu L₂,₃', e0: 931, ep: 19.3, wl: 19.8, weakWL: true }
+};
+const EELS_DEFAULT = { source: 'w', kv: 200, element: 'C', tl: 0.4, aperture: 50 };
+function eelsDerived(pr) {
+  const src = EELS_SOURCES.find(s => s.id === pr.source) || EELS_SOURCES[0];
+  const kv = clamp(Number(pr.kv) || 200, 60, 300); const V = kv * 1000;
+  const gamma = 1 + kv / 511; const beta = Math.sqrt(1 - 1 / (gamma * gamma));
+  const lambdaPm = 1226.4 / Math.sqrt(V * (1 + 0.9785e-6 * V));
+  const el = EELS_ELEMENTS[pr.element] || EELS_ELEMENTS.C; const tl = clamp(Number(pr.tl) || 0.4, 0.02, 2.5);
+  const ap = clamp(Number(pr.aperture) || 50, 10, 200); const current = Math.pow(ap / 50, 2);
+  const pZero = Math.exp(-tl); const pPl = tl * Math.exp(-tl); const pMulti = 1 - pZero - pPl;
+  return { src, kv, gamma, beta, lambdaPm, el, tl, ap, current, pZero, pPl, pMulti, thin: tl <= 0.5, speedVis: 0.55 + beta * 0.8 };
+}
+function eelsSpectrum(d) {
+  const low = [], core = []; const s = d.src.fwhm / 2.355; const A0 = 1e9 * d.current;
+  const pois = n => Math.pow(d.tl, n) * Math.exp(-d.tl) / [1, 1, 2, 6, 24][n];
+  const f = E => {
+    let y = A0 * pois(0) * Math.exp(-0.5 * Math.pow(E / s, 2));
+    for (let n = 1; n <= 4; n++) { const sg = 2.6 * Math.sqrt(n); const dE = E - n * d.el.ep; y += A0 * pois(n) * 0.2 * (Math.exp(-0.5 * dE * dE / (sg * sg)) + 0.08 / (1 + dE * dE / (sg * sg * 4))) * (Math.abs(dE) < 80 ? 1 : 0); }
+    if (E > 0) y += A0 * 2e-4 * d.tl * Math.pow((E + 5) / 15, -3);
+    const E0 = d.el.e0;
+    if (E > E0 - 60) {
+      const bg = A0 * 0.02 * d.tl * (1 + d.tl) * Math.pow(E / 10, -3);
+      const J = A0 * 0.02 * Math.pow(E0 / 10, -3) * 0.55 * d.tl * Math.exp(-d.tl * 0.6);
+      const on = 1 / (1 + Math.exp(-(E - E0) / 0.8));
+      let edge = J * on * Math.pow(E0 / Math.max(E, E0), 1.6);
+      if (d.el.wl) { const k = d.el.weakWL ? 0.25 : 1.6; edge += J * k * (Math.exp(-0.5 * Math.pow((E - E0 - 1.5) / 1.3, 2)) + 0.55 * Math.exp(-0.5 * Math.pow((E - E0 - 1.5 - d.el.wl) / 1.4, 2))); }
+      y = Math.max(y, bg) + edge;
+    }
+    return y;
+  };
+  for (let i = 0; i <= 330; i++) { const E = -5 + i * 0.2; const y = f(E); low.push([E, Math.max(0, y + Math.sqrt(y) * 0.6 * gauss(i, 3))]); }
+  for (let i = 0; i <= 320; i++) { const E = d.el.e0 - 40 + i * 0.5; const y = f(E); core.push([E, Math.max(0, y + Math.sqrt(Math.max(y, 1)) * 0.6 * gauss(i, 11))]); }
+  const lowMax = Math.max.apply(null, low.map(p => p[1])); const coreMax = Math.max.apply(null, core.map(p => p[1]));
+  const raw = lowMax / Math.max(coreMax, 1e-9) * 0.75; const nice = [1, 2, 5]; let gain = 1; for (let e = 0; e < 8; e++) for (const m of nice) { const g = m * Math.pow(10, e); if (g <= raw) gain = g; }
+  return { low, core, lowMax: lowMax * 1.05, coreMax: coreMax * gain * 1.1, gain };
+}
+
+/* ---------- Concepts (overlay cards) ---------- */
+function conceptCard(mode, id, d) {
+  if (mode === 'xps') {
+    const L = d.target;
+    const cards = {
+      photon: { title: 'X-ray photon', kind: 'Light quantum', body: 'A packet of electromagnetic energy from the X-ray anode. In XPS its energy is fixed by the source line and is fully transferred to one electron when absorbed.', formula: 'E = hν = ' + fmt(d.hv) + ' eV   ·   λ = hc / E = ' + fmt(d.lambdaNm, 3) + ' nm' },
+      core: { title: 'Core level · ' + L.l, kind: 'Bound electron', body: 'An inner-shell electron held tightly by the nucleus. Its binding energy, measured from the Fermi level, identifies the element and shifts slightly with chemical state.', formula: 'BE(' + L.l + ') = ' + fmt(L.be) + ' eV' },
+      electron: { title: 'Photoelectron', kind: 'Emitted electron', body: d.threshold ? 'No electron is emitted: the photon energy is below the binding energy plus the work function.' : 'The freed electron keeps the energy left over after paying the binding energy and the spectrometer work function.', formula: d.threshold ? 'hν = ' + fmt(d.hv) + ' eV  <  BE + φ = ' + fmt(L.be + d.phi) + ' eV' : 'KE = hν − BE − φ = ' + fmt(d.hv) + ' − ' + fmt(L.be) + ' − ' + fmt(d.phi) + ' = ' + fmt(d.ke) + ' eV   ·   v = √(2KE/mₑ) = ' + fmt(d.v / 1e6, 2) + ' × 10⁶ m/s' },
+      fermi: { title: 'Fermi level', kind: 'Energy reference', body: 'The top of the filled electron states. XPS binding energies are quoted relative to it, because sample and spectrometer share it when they are electrically connected.', formula: 'BE = 0 at E_F' },
+      vacuum: { title: 'Work function φ', kind: 'Energy barrier', body: 'The extra energy needed to lift an electron from the Fermi level to the vacuum level. The spectrometer’s work function is calibrated and subtracted.', formula: 'φ = ' + fmt(d.phi) + ' eV' },
+      surface: { title: 'Escape depth (IMFP)', kind: 'Surface sensitivity', body: 'Photoelectrons from deeper than a few inelastic mean free paths lose energy on the way out and end up in the background, not the peak. That is why XPS probes only the top few nanometres.', formula: d.threshold ? 'No emission' : 'λ_IMFP ≈ ' + fmt(d.imfpNm, 1) + ' nm at KE = ' + fmt(d.ke, 0) + ' eV   ·   ~95 % of signal from 3λ' },
+      analyzer: { title: 'Hemispherical analyser', kind: 'Energy filter', body: 'Two concentric hemispheres with a voltage between them. Only electrons with the chosen pass energy follow the central path to the detector; the spectrum is recorded by scanning a retarding voltage.', formula: 'E_pass = k·e·ΔV,  resolution ΔE ≈ E_pass·(w / 2R₀)' },
+      detector: { title: 'Detector', kind: 'Electron counter', body: 'Channeltron or multichannel plate that counts each arriving electron. Counts versus energy build the spectrum.', formula: 'noise ∝ √counts' },
+      peak: { title: 'Photoelectron peak', kind: 'Spectrum feature', body: 'Each core level appears as a peak at its binding energy. The step in background on the high-BE side comes from electrons that lost energy on the way out.', formula: d.main ? d.main.l + ' at BE = ' + fmt(d.main.be) + ' eV (KE = ' + fmt(d.ke) + ' eV)' : 'No accessible peak' }
+    };
+    return cards[id];
+  }
+  const cards = {
+    filament: { title: 'Thermionic source', kind: 'Electron gun', body: d.src.thermionic ? 'A heated filament (' + d.src.label + ') boils electrons over its work-function barrier. Hotter sources give a broader spread of electron energies.' : 'A field-emission tip extracts electrons with a strong electric field instead of heat, giving a narrow energy spread.', formula: 'J = A·T²·e^(−φ/kT)   ·   T ≈ ' + d.src.temp + ' K   ·   ΔE ≈ ' + fmt(d.src.fwhm, 2) + ' eV' },
+    aperture: { title: 'Condenser aperture', kind: 'Beam-defining aperture', body: 'A small hole in a metal strip below the condenser lens. It blocks off-axis electrons, setting the beam current and convergence angle.', formula: 'd = ' + d.ap + ' µm   ·   I ∝ d² → ' + fmt(d.current, 2) + '× current' },
+    electron: { title: 'Fast electron', kind: 'Probe', body: 'Accelerated through the high voltage, the beam electrons move at a large fraction of the speed of light, so relativistic formulas are needed.', formula: 'V = ' + d.kv + ' kV   ·   v/c = ' + fmt(d.beta, 3) + '   ·   λ = ' + fmt(d.lambdaPm, 2) + ' pm' },
+    plasmon: { title: 'Plasmon', kind: 'Collective excitation', body: 'A collective oscillation of the valence electrons. Each plasmon excitation costs the beam electron a characteristic energy; thicker specimens create multiple plasmon peaks.', formula: 'E_p ≈ ' + fmt(d.el.ep) + ' eV   ·   P(n) = (t/λ)ⁿ e^(−t/λ) / n!' },
+    core: { title: 'Inner-shell ionization', kind: 'Core loss', body: 'The beam electron knocks out a core electron, losing at least that electron’s binding energy. This makes an element-specific ionization edge.', formula: d.el.edge + ' edge onset ≈ ' + d.el.e0 + ' eV' },
+    zlp: { title: 'Zero-loss peak', kind: 'Spectrum feature', body: 'Electrons that lost no measurable energy. Its width is set mostly by the energy spread of the source, and its area against the total gives the thickness.', formula: 'FWHM ≈ ' + fmt(d.src.fwhm, 2) + ' eV   ·   t/λ = ln(I_total / I_0) = ' + fmt(d.tl, 2) },
+    prism: { title: 'Magnetic prism', kind: 'Spectrometer', body: 'A magnetic sector bends each electron on a circle whose radius depends on its momentum, so electrons that lost more energy bend more and land at a different position.', formula: 'r = p / (eB)   ·   dispersion ≈ µm per eV' },
+    edge: { title: d.el.edge + ' ionization edge', kind: 'Spectrum feature', body: 'A sharp rise at the binding energy followed by a slow decay, sitting on a falling background. Transition metals show sharp “white lines” at the L₃ and L₂ edges.', formula: 'onset ≈ ' + d.el.e0 + ' eV   ·   display gain ×' + (d.gain || 1) },
+    specimen: { title: 'Specimen thickness', kind: 't / λ', body: 'Thickness relative to the inelastic mean free path. Below about 0.5, most electrons scatter at most once and edges stay clear.', formula: 't/λ = ' + fmt(d.tl, 2) + '   ·   zero-loss ' + fmt(d.pZero * 100, 0) + ' %  ·  single ' + fmt(d.pPl * 100, 0) + ' %  ·  multiple ' + fmt(d.pMulti * 100, 0) + ' %' }
+  };
+  return cards[id];
+}
+
+/* ---------- Narration ---------- */
+const DEFAULT_SCRIPTS = {
+  xps: [
+    { title: 'X-ray photons arrive', lines: [
+      'X-ray photoelectron spectroscopy starts with a beam of soft X-rays aimed at the surface of a sample.',
+      'Each photon carries a fixed energy, h nu: 1486.6 electronvolts for an aluminium K-alpha source.',
+      'Higher photon energy means a shorter wavelength, so the waves bunch closer together as h nu rises.'] },
+    { title: 'Core electron excitation', lines: [
+      'When a photon is absorbed, all of its energy goes to a single electron in the atom.',
+      'Deep core electrons are held tightly; the energy needed to free one is its binding energy.',
+      'Binding energy is measured from the Fermi level, and it is a fingerprint of the element and its chemical state.'] },
+    { title: 'Photoelectron emission', lines: [
+      'If the photon energy exceeds the binding energy plus the work function, the electron escapes with the energy left over.',
+      'That leftover is its kinetic energy: KE equals h nu minus the binding energy minus phi.',
+      'Only electrons from the top few nanometres escape without losing energy, which makes XPS surface sensitive.'] },
+    { title: 'Detection and the spectrum', lines: [
+      'A hemispherical analyser bends each electron; only those at the chosen pass energy reach the detector.',
+      'Counting electrons as the energy is scanned builds the spectrum, one event at a time.',
+      'Converting kinetic energy to binding energy turns each peak into a label for an element’s core level.'] }
+  ],
+  eels: [
+    { title: 'Thermionic source and condenser aperture', lines: [
+      'In the transmission electron microscope, electrons are boiled off a heated filament: a thermionic source.',
+      'They are accelerated through a high voltage, reaching a large fraction of the speed of light.',
+      'The condenser aperture trims off-axis electrons, setting the beam current and convergence.'] },
+    { title: 'Inelastic scattering in the specimen', lines: [
+      'Most fast electrons cross a thin specimen without losing energy; they form the zero-loss peak.',
+      'Some excite plasmons, collective oscillations of the valence electrons, and lose a few tens of electronvolts.',
+      'A few knock out an inner-shell electron, losing at least its binding energy; that creates an ionization edge.'] },
+    { title: 'Magnetic prism spectrometer', lines: [
+      'Below the specimen, a magnetic prism bends the beam, and electrons that lost more energy bend more strongly.',
+      'This spreads the electrons out by energy loss across the detector, the way a glass prism spreads light.'] },
+    { title: 'Building the EELS spectrum', lines: [
+      'The spectrum shows the intense zero-loss peak, then plasmon peaks, then core-loss edges on a falling background.',
+      'Edge onsets identify the elements; thicker specimens add plural scattering that buries the edges.',
+      'Keep the specimen thin, with t over lambda below about 0.5, for clean edges you can quantify.'] }
+  ]
+};
+const WPS = 2.6;
+function buildTimeline(chapters) {
+  let t = 0; const out = chapters.map((c, ci) => {
+    const start = t; const sentences = c.lines.map((text, si) => { const words = text.split(/\s+/).filter(Boolean); const dur = Math.max(2.6, words.length / WPS + 0.5); const s = { ci, si, text, words, t0: t, t1: t + dur }; t += dur; return s; });
+    return { title: c.title, start, end: t, sentences };
+  });
+  return { chapters: out, total: t, sentences: out.reduce((a, c) => a.concat(c.sentences), []) };
+}
+function scriptToText(chapters) { return chapters.map(c => '# ' + c.title + '\n' + c.lines.join('\n')).join('\n\n'); }
+function parseScript(text, fallback) {
+  const raw = String(text || '').replace(/\r/g, '').replace(/^WEBVTT.*$/m, '');
+  const lines = raw.split('\n').map(l => l.replace(/^\s*[\[(]?\d{1,2}:\d{2}(?::\d{2})?(?:[.,]\d+)?[\])]?\s*(-->.*)?/, '').replace(/^\d+$/, '').trim()).filter(Boolean);
+  if (!lines.length) return { error: 'The script is empty. Paste or upload narration text first.' };
+  const heads = []; let cur = null;
+  lines.forEach(l => {
+    const m = l.match(/^(?:#{1,3}\s*|chapter\s*\d+\s*[:.\-–]\s*|stage\s*\d+\s*[:.\-–]\s*)(.+)$/i);
+    if (m) { cur = { title: m[1].trim(), body: [] }; heads.push(cur); return; }
+    if (!cur) { cur = { title: '', body: [] }; heads.push(cur); }
+    cur.body.push(l);
+  });
+  const split = body => body.join(' ').replace(/\s+/g, ' ').split(/(?<=[.!?])\s+(?=[A-Z0-9“"(])/).map(s => s.trim()).filter(s => s.split(/\s+/).length >= 2);
+  let chapters;
+  const titled = heads.filter(h => h.title);
+  if (titled.length >= 2) {
+    chapters = titled.slice(0, 4).map((h, i) => ({ title: h.title, lines: split(h.body) }));
+    titled.slice(4).forEach(h => { chapters[3].lines = chapters[3].lines.concat(split(h.body)); });
+    const lead = heads.find(h => !h.title); if (lead) chapters[0].lines = split(lead.body).concat(chapters[0].lines);
+    while (chapters.length < 4) chapters.push({ title: fallback[chapters.length].title, lines: [] });
+  } else {
+    const all = split(heads.reduce((a, h) => a.concat(h.body), []));
+    if (!all.length) return { error: 'No sentences were found. End sentences with a full stop, question mark or exclamation mark.' };
+    const per = Math.ceil(all.length / 4);
+    chapters = [0, 1, 2, 3].map(i => ({ title: fallback[i].title, lines: all.slice(i * per, (i + 1) * per) }));
+  }
+  let total = 0; chapters.forEach((c, i) => { if (!c.lines.length) c.lines = [fallback[i].lines[0]]; c.lines = c.lines.slice(0, 20); total += c.lines.length; });
+  return { chapters, note: total >= 80 ? 'Only the first 20 sentences of each chapter are used.' : '' };
+}
+
+/* ================= Canvas motion graphics (every frame is a pure function of time) ================= */
+const C = { bg: '#07090D', bg2: '#0C1118', panel: '#111823', line: '#223044', grid: '#131B26', text: '#E8EEF5', muted: '#93A3B8', dim: '#5C6B80', photon: '#FFB547', electron: '#45E0D6', energy: '#FF6B9A', violet: '#A78BFA', ok: '#6EE7A0', bad: '#FF6B6B', metal: '#3A475A', heat: '#FF8A3D' };
+const FONT = "'Instrument Sans', system-ui, sans-serif", MONO = "'JetBrains Mono', ui-monospace, monospace", SERIF = "'Instrument Serif', Georgia, serif";
+
+function glow(ctx, x, y, r, color, a) { const g = ctx.createRadialGradient(x, y, 0, x, y, r); g.addColorStop(0, color); g.addColorStop(1, 'rgba(0,0,0,0)'); ctx.globalAlpha = a === undefined ? 0.6 : a; ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); ctx.globalAlpha = 1; }
+function dot(ctx, x, y, r, color, halo) { if (halo !== false) glow(ctx, x, y, r * 4, color, 0.45); ctx.fillStyle = color; ctx.beginPath(); ctx.arc(x, y, r, 0, Math.PI * 2); ctx.fill(); }
+function line(ctx, x1, y1, x2, y2, color, w, dash) { ctx.strokeStyle = color; ctx.lineWidth = w || 1; ctx.setLineDash(dash || []); ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2, y2); ctx.stroke(); ctx.setLineDash([]); }
+function arrow(ctx, x1, y1, x2, y2, color, w) { line(ctx, x1, y1, x2, y2, color, w || 2); const a = Math.atan2(y2 - y1, x2 - x1), h = 10 + (w || 2); ctx.fillStyle = color; ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - h * Math.cos(a - 0.4), y2 - h * Math.sin(a - 0.4)); ctx.lineTo(x2 - h * Math.cos(a + 0.4), y2 - h * Math.sin(a + 0.4)); ctx.closePath(); ctx.fill(); }
+function rrect(ctx, x, y, w, h, r, fill, stroke, lw) { ctx.beginPath(); ctx.roundRect ? ctx.roundRect(x, y, w, h, r) : ctx.rect(x, y, w, h); if (fill) { ctx.fillStyle = fill; ctx.fill(); } if (stroke) { ctx.strokeStyle = stroke; ctx.lineWidth = lw || 1; ctx.stroke(); } }
+function text(ctx, s, x, y, o) { o = o || {}; ctx.font = (o.weight || 500) + ' ' + (o.size || 16) + 'px ' + (o.font || FONT); ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.base || 'alphabetic'; ctx.globalAlpha = o.alpha === undefined ? 1 : o.alpha; if (o.bg) { const w = ctx.measureText(s).width, pad = 6, sz = o.size || 16; const bx = o.align === 'center' ? x - w / 2 : o.align === 'right' ? x - w : x; rrect(ctx, bx - pad, y - sz - 2, w + pad * 2, sz + 10, 6, o.bg, o.border); } ctx.fillStyle = o.color || C.text; ctx.fillText(s, x, y); ctx.globalAlpha = 1; }
+function wave(ctx, x1, y1, x2, y2, wl, amp, phase, color, w, a) {
+  const L = Math.hypot(x2 - x1, y2 - y1); if (L < 2) return; const ux = (x2 - x1) / L, uy = (y2 - y1) / L; const nx = -uy, ny = ux;
+  ctx.strokeStyle = color; ctx.lineWidth = w || 2.5; ctx.globalAlpha = a === undefined ? 1 : a; ctx.beginPath();
+  for (let s = 0; s <= L; s += 2) { const env = Math.sin(Math.PI * s / L); const o = Math.sin((s / wl) * Math.PI * 2 - phase) * amp * env; const x = x1 + ux * s + nx * o, y = y1 + uy * s + ny * o; s === 0 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); }
+  ctx.stroke(); ctx.globalAlpha = 1;
+}
+function readout(ctx, x, y, rows, title) {
+  const w = 300, h = 34 + rows.length * 30; rrect(ctx, x, y, w, h, 12, 'rgba(12,17,24,0.86)', C.line);
+  text(ctx, title, x + 16, y + 24, { size: 12, weight: 700, color: C.muted, font: MONO });
+  rows.forEach((r, i) => { text(ctx, r[0], x + 16, y + 54 + i * 30, { size: 15, color: C.muted }); text(ctx, r[1], x + w - 16, y + 54 + i * 30, { size: 16, weight: 600, align: 'right', font: MONO, color: r[2] || C.text }); });
+}
+function bgGrid(ctx) { ctx.fillStyle = C.bg; ctx.fillRect(0, 0, W, H); ctx.strokeStyle = C.grid; ctx.lineWidth = 1; for (let x = 0; x <= W; x += 40) { ctx.beginPath(); ctx.moveTo(x, 0); ctx.lineTo(x, H); ctx.stroke(); } for (let y = 0; y <= H; y += 40) { ctx.beginPath(); ctx.moveTo(0, y); ctx.lineTo(W, y); ctx.stroke(); } const g = ctx.createRadialGradient(W / 2, H / 2, 100, W / 2, H / 2, 820); g.addColorStop(0, 'rgba(7,9,13,0)'); g.addColorStop(1, 'rgba(7,9,13,0.9)'); ctx.fillStyle = g; ctx.fillRect(0, 0, W, H); }
+function hot(S, id, x, y, r, labelText) { S.hs.push({ id, x, y, r, label: labelText }); if (S.ov && labelText) text(S.ctx, labelText, x, y - r - 10, { size: 13, weight: 600, align: 'center', color: C.text, bg: 'rgba(7,9,13,0.8)', border: C.line }); }
+function banner(ctx, s, color) { text(ctx, s, W / 2, 60, { size: 17, weight: 600, align: 'center', color: color || C.bad, bg: 'rgba(40,12,14,0.85)', border: color || C.bad }); }
+function slab(ctx, x, y, w, h, rows, cols, lt, excite) {
+  const g = ctx.createLinearGradient(0, y, 0, y + h); g.addColorStop(0, '#1C2635'); g.addColorStop(1, '#0D121A'); rrect(ctx, x, y, w, h, 6, g, '#2E3C52');
+  line(ctx, x, y, x + w, y, '#5B6F8C', 2);
+  for (let r = 0; r < rows; r++) for (let c = 0; c < cols; c++) { const ax = x + 24 + c * ((w - 48) / (cols - 1)), ay = y + 20 + r * ((h - 32) / Math.max(1, rows - 1)); const jit = Math.sin(lt * 3 + r * 1.7 + c) * 1.2; ctx.fillStyle = '#34445C'; ctx.beginPath(); ctx.arc(ax + jit, ay, 6, 0, 7); ctx.fill(); if (excite && excite(r, c)) glow(ctx, ax, ay, 26, C.photon, 0.5); }
+}
+
+/* ---------------- XPS ---------------- */
+function xps1(S) {
+  const { ctx, d, lt, p } = S; bgGrid(ctx);
+  rrect(ctx, 60, 150, 210, 120, 14, '#162031', '#33445E', 1.5); rrect(ctx, 250, 188, 40, 44, 6, '#26344A', '#4A5D7C');
+  text(ctx, 'X-ray source', 80, 184, { size: 14, color: C.muted }); text(ctx, d.srcLabel, 80, 214, { size: 22, weight: 700, font: MONO, color: C.photon }); text(ctx, fmt(d.hv) + ' eV', 80, 246, { size: 15, font: MONO, color: C.text });
+  glow(ctx, 290, 210, 60, C.photon, 0.35 + 0.15 * Math.sin(lt * 6));
+  slab(ctx, 640, 480, 580, 170, 4, 14, lt, (r, c) => r === 0 && c === 4 + (Math.floor(lt * 1.2) % 5));
+  hot(S, 'surface', 930, 560, 60, 'Sample');
+  const wl = clamp(64 * 1486.6 / d.hv, 9, 150); const x1 = 290, y1 = 210, x2 = 860, y2 = 482; const L = Math.hypot(x2 - x1, y2 - y1);
+  for (let i = 0; i < 6; i++) {
+    const s = ((lt * 0.28 + i / 6) % 1); const head = s * L, tail = Math.max(0, head - 150);
+    const ux = (x2 - x1) / L, uy = (y2 - y1) / L; const hx = x1 + ux * head, hy = y1 + uy * head;
+    wave(ctx, x1 + ux * tail, y1 + uy * tail, hx, hy, wl, 16, lt * 10, C.photon, 2.5, 0.35 + 0.65 * Math.sin(Math.PI * s));
+    glow(ctx, hx, hy, 22, C.photon, 0.5 * Math.sin(Math.PI * s));
+    if (i === 0) hot(S, 'photon', hx, hy, 26, 'Photon · hν');
+  }
+  text(ctx, 'λ = ' + fmt(d.lambdaNm, 3) + ' nm', 470, 330, { size: 14, font: MONO, color: C.photon, alpha: seg(p, 0.35, 0.55) });
+  readout(ctx, 930, 70, [['Photon energy hν', fmt(d.hv) + ' eV', C.photon], ['Wavelength λ', fmt(d.lambdaNm, 3) + ' nm'], ['Element', d.el.name + ' (Z = ' + d.el.Z + ')']], 'STAGE 1 · INCIDENT BEAM');
+}
+function xps2(S) {
+  const { ctx, d, lt, p } = S; bgGrid(ctx); const L = d.target;
+  const ax = 330, ay = 390; const maxShell = Math.max.apply(null, d.levels.map(x => x.shell)) + 1; const radii = [0, 64, 112, 158, 202, 240].slice(1, maxShell + 1);
+  glow(ctx, ax, ay, 60, C.energy, 0.35); dot(ctx, ax, ay, 18, '#D9467A', false); text(ctx, d.el.name.slice(0, 2) === 'Al' ? 'Al' : Object.keys(XPS_ELEMENTS).find(k => XPS_ELEMENTS[k] === d.el), ax, ay + 6, { size: 15, weight: 700, align: 'center', color: '#fff' });
+  radii.forEach((r, i) => { ctx.strokeStyle = i + 1 === L.shell ? 'rgba(69,224,214,0.55)' : '#26344A'; ctx.lineWidth = i + 1 === L.shell ? 2 : 1.2; ctx.beginPath(); ctx.arc(ax, ay, r, 0, 7); ctx.stroke(); const n = [2, 8, 8, 8, 8][i]; for (let k = 0; k < n; k++) { const a = lt * (0.9 - i * 0.15) + k * Math.PI * 2 / n; if (i + 1 === L.shell && k === 0) continue; dot(ctx, ax + Math.cos(a) * r, ay + Math.sin(a) * r, 4, '#6FA8DC', false); } });
+  const rC = radii[L.shell - 1]; const ca = -0.7; const cx = ax + Math.cos(ca) * rC, cy = ay + Math.sin(ca) * rC;
+  const pIn = ease(seg(p, 0.05, 0.35)); const px = lerp(-40, cx - 6, pIn);
+  if (p < 0.38) { wave(ctx, Math.max(-40, px - 200), cy, px, cy, clamp(56 * 1486.6 / d.hv, 9, 140), 14, lt * 10, C.photon, 2.5); glow(ctx, px, cy, 20, C.photon, 0.5); hot(S, 'photon', px, cy, 24, 'Photon · hν'); }
+  const flash = seg(p, 0.35, 0.42) * (1 - seg(p, 0.42, 0.52)); if (flash > 0) glow(ctx, cx, cy, 90, '#FFFFFF', flash * 0.8);
+  const out = seg(p, 0.45, 1);
+  if (d.threshold) {
+    const bounce = Math.sin(out * Math.PI) * 38; dot(ctx, cx + bounce * 0.6, cy - bounce, 7, C.electron); hot(S, 'electron', cx + bounce * 0.6, cy - bounce, 18, 'Excited, not freed');
+    if (p > 0.45) banner(ctx, 'hν = ' + fmt(d.hv) + ' eV is below BE + φ = ' + fmt(L.be + d.phi) + ' eV · no photoelectron');
+  } else {
+    const dist = ease(out) * 520 * clamp(d.speedVis, 0.45, 1.2); const ex = cx + 0.8 * dist, ey = cy - 0.6 * dist;
+    if (out > 0) { ctx.setLineDash([3, 6]); ctx.strokeStyle = 'rgba(69,224,214,0.35)'; ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(ex, ey); ctx.stroke(); ctx.setLineDash([]); ctx.strokeStyle = C.electron; ctx.beginPath(); ctx.arc(cx, cy, 8, 0, 7); ctx.setLineDash([3, 3]); ctx.stroke(); ctx.setLineDash([]); }
+    dot(ctx, out > 0 ? ex : cx, out > 0 ? ey : cy, 7, C.electron); hot(S, out > 0 ? 'electron' : 'core', out > 0 ? ex : cx, out > 0 ? ey : cy, 18, out > 0 ? 'Photoelectron' : L.l + ' electron');
+    if (out > 0.05) text(ctx, 'core hole', cx - 18, cy + 28, { size: 12, color: C.muted, align: 'center' });
+  }
+  if (out === 0 || d.threshold) hot(S, 'core', cx, cy, 16, S.ov ? null : null);
+  // Energy ladder (√ scale)
+  const X0 = 780, X1 = 1160, yB = 640; const maxE = Math.max(d.hv, L.be + d.phi) * 1.05; const Y = e => yB - 500 * Math.sqrt(Math.max(0, e) / maxE);
+  const yF = Y(L.be); let yV = Y(L.be + d.phi); if (yF - yV < 30) yV = yF - 30; const yT = Math.min(Y(d.hv), d.threshold ? yV + 12 : yV - 20);
+  text(ctx, 'ENERGY LEVELS', X0, 92, { size: 12, weight: 700, color: C.muted, font: MONO }); text(ctx, '√ energy scale (not linear)', X1, 92, { size: 12, align: 'right', color: C.dim });
+  line(ctx, X0, yV, X1, yV, '#8FA3BF', 2); text(ctx, 'Vacuum level', X0, yV - 8, { size: 13, color: C.muted }); hot(S, 'vacuum', X0 + 60, yV, 14, null);
+  line(ctx, X0, yF, X1, yF, '#8FA3BF', 1.5, [6, 6]); text(ctx, 'Fermi level  E_F', X0, yF + 18, { size: 13, color: C.muted }); hot(S, 'fermi', X0 + 60, yF, 14, null);
+  line(ctx, X0, yB, X1, yB, C.electron, 4); text(ctx, L.l + '  ·  BE ' + fmt(L.be) + ' eV', X0, yB + 26, { size: 14, weight: 600, color: C.electron, font: MONO }); hot(S, 'core', X0 + 150, yB, 16, null);
+  const grow = ease(seg(p, 0.2, 0.42)); const ay2 = lerp(yB, yT, grow); if (grow > 0) arrow(ctx, 880, yB, 880, ay2, C.photon, 3);
+  if (grow > 0.2) text(ctx, 'hν ' + fmt(d.hv) + ' eV', 896, (yB + ay2) / 2, { size: 14, color: C.photon, font: MONO });
+  const brk = (y1, y2, lbl, col) => { if (Math.abs(y1 - y2) < 3) return; const x = 1100; line(ctx, x, y1, x, y2, col, 2); line(ctx, x - 6, y1, x + 6, y1, col, 2); line(ctx, x - 6, y2, x + 6, y2, col, 2); text(ctx, lbl, x - 12, (y1 + y2) / 2 + 5, { size: 13, align: 'right', color: col, font: MONO }); };
+  if (p > 0.3) { brk(yB, yF, 'BE', C.electron); brk(yF, yV, 'φ', '#8FA3BF'); }
+  if (!d.threshold && p > 0.5) { brk(yV, yT, 'KE ' + fmt(d.ke, 0), C.ok); const ride = ease(seg(p, 0.45, 0.8)); dot(ctx, 960, lerp(yB, yT, ride), 6, C.electron); }
+  if (d.threshold && p > 0.45) { line(ctx, X0, yT, X1, yT, C.bad, 2, [4, 4]); text(ctx, 'hν stops below the vacuum level', X0, yT + 20, { size: 13, color: C.bad }); }
+}
+function xps3(S) {
+  const { ctx, d, lt, p } = S; bgGrid(ctx);
+  const sx = 120, sy = 430, sw = 900, sh = 230, rows = 5, cols = 16; slab(ctx, sx, sy, sw, sh, rows, cols, lt);
+  hot(S, 'surface', sx + 60, sy + 110, 50, 'Top few nm');
+  const rowY = r => sy + 20 + r * ((sh - 32) / (rows - 1)); const colX = c => sx + 24 + c * ((sw - 48) / (cols - 1));
+  const imfpPx = 42 * (d.imfpNm || 1); ctx.fillStyle = 'rgba(69,224,214,0.07)'; ctx.fillRect(sx, sy, sw, Math.min(sh, imfpPx * 1.4)); line(ctx, sx, sy + Math.min(sh, imfpPx * 1.4), sx + sw, sy + Math.min(sh, imfpPx * 1.4), 'rgba(69,224,214,0.5)', 1, [5, 5]);
+  text(ctx, 'escape depth ≈ ' + (d.threshold ? '—' : fmt(d.imfpNm * 3, 1) + ' nm'), sx + sw - 10, sy + Math.min(sh, imfpPx * 1.4) - 8, { size: 13, align: 'right', color: C.electron, font: MONO });
+  const ENT = [1120, 120]; rrect(ctx, 1080, 60, 150, 70, 10, '#162031', '#33445E'); text(ctx, 'to analyser', 1155, 102, { size: 14, align: 'center', color: C.muted });
+  let firstHot = false;
+  for (let k = 0; k < 16; k++) {
+    const P = 2.8; const age = ((lt - k * 0.23) % P + P) % P; const r = Math.floor(rnd(k, 4) * rows); const c = 2 + Math.floor(rnd(k, 5) * (cols - 4)); const ax = colX(c), ay = rowY(r);
+    const pa = clamp(age / 0.5, 0, 1); if (pa < 1) { const px = lerp(ax - 180, ax, pa), py = lerp(ay - 260, ay, pa); wave(ctx, px - 60, py - 86, px, py, clamp(40 * 1486.6 / d.hv, 7, 90), 8, lt * 12, C.photon, 2, 0.8); continue; }
+    const t2 = age - 0.5; if (t2 < 0.2) glow(ctx, ax, ay, 26, C.photon, 0.7 * (1 - t2 / 0.2));
+    if (d.threshold) continue;
+    const esc = r * 44 < imfpPx * 1.1; const lossy = !esc && r * 44 < imfpPx * 2.4;
+    const v = 170 + 330 * d.speedVis; const dx = ENT[0] - ax, dy = ENT[1] - ay, Ld = Math.hypot(dx, dy); let ux = dx / Ld, uy = dy / Ld;
+    if (esc) {
+      const dist = t2 * v; if (dist > Ld) continue; const ex = ax + ux * dist, ey = ay + uy * dist;
+      ctx.strokeStyle = 'rgba(69,224,214,0.35)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(ex - ux * 40, ey - uy * 40); ctx.lineTo(ex, ey); ctx.stroke(); dot(ctx, ex, ey, 5.5, C.electron);
+      if (!firstHot && ey < sy) { hot(S, 'electron', ex, ey, 18, 'KE ' + fmt(d.ke, 0) + ' eV'); firstHot = true; }
+    } else {
+      let x = ax, y = ay; const steps = Math.min(Math.floor(t2 * 8), lossy ? 9 : 5); ctx.strokeStyle = 'rgba(147,163,184,0.45)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(x, y);
+      for (let i = 0; i < steps; i++) { const a = rnd(k * 31 + i, 9) * Math.PI * 2 - (lossy ? Math.PI / 2 : 0); x += Math.cos(a) * 22; y += Math.sin(a) * 18 - (lossy ? 10 : 0); ctx.lineTo(x, y); }
+      ctx.stroke(); if (y < sy - 2 && lossy) { const dist = (t2 - 1.1) * v * 0.6; if (dist > 0) { x += ux * dist; y += uy * dist; } }
+      dot(ctx, x, y, 4, lossy ? '#8C9BB0' : '#5C6B80', false);
+    }
+  }
+  if (d.threshold) banner(ctx, 'hν below BE + φ: photons are absorbed but no photoelectrons leave');
+  readout(ctx, 70, 60, [['Kinetic energy', d.threshold ? '—' : fmt(d.ke) + ' eV', C.ok], ['Speed', d.threshold ? '—' : fmt(d.v / 1e6, 2) + ' × 10⁶ m/s', C.electron], ['IMFP λ', d.threshold ? '—' : fmt(d.imfpNm, 2) + ' nm']], 'STAGE 3 · EMISSION');
+  text(ctx, 'cyan: no energy lost → peak   ·   grey: scattered → background', 640, 405, { size: 13, align: 'center', color: C.muted, alpha: seg(p, 0.3, 0.45) });
+}
+function drawAxes(ctx, x, y, w, h, xTicks, xLabel, yLabel) {
+  rrect(ctx, x - 50, y - 30, w + 80, h + 90, 14, 'rgba(12,17,24,0.9)', C.line);
+  line(ctx, x, y + h, x + w, y + h, C.dim, 1.5); line(ctx, x, y, x, y + h, C.dim, 1.5);
+  xTicks.forEach(t => { line(ctx, t.x, y + h, t.x, y + h + 6, C.dim, 1); text(ctx, t.l, t.x, y + h + 24, { size: 12, align: 'center', color: C.muted, font: MONO }); line(ctx, t.x, y, t.x, y + h, 'rgba(34,48,68,0.5)', 1); });
+  text(ctx, xLabel, x + w / 2, y + h + 48, { size: 13, align: 'center', color: C.muted });
+  ctx.save(); ctx.translate(x - 22, y + h / 2); ctx.rotate(-Math.PI / 2); text(ctx, yLabel, 0, 0, { size: 13, align: 'center', color: C.muted }); ctx.restore();
+}
+function xps4(S) {
+  const { ctx, d, lt, p, spec } = S; bgGrid(ctx);
+  const cx = 300, cy = 540, R0 = 160, Rin = 112, Rout = 208;
+  ctx.lineWidth = 16; ctx.strokeStyle = '#26344A'; ctx.beginPath(); ctx.arc(cx, cy, Rout + 8, Math.PI, 0); ctx.stroke(); ctx.beginPath(); ctx.arc(cx, cy, Rin - 8, Math.PI, 0); ctx.stroke();
+  ctx.lineWidth = 1; ctx.strokeStyle = 'rgba(69,224,214,0.25)'; ctx.setLineDash([4, 6]); ctx.beginPath(); ctx.arc(cx, cy, R0, Math.PI, 0); ctx.stroke(); ctx.setLineDash([]);
+  text(ctx, '−', cx, cy - Rout - 22, { size: 18, align: 'center', color: C.muted }); text(ctx, '+', cx, cy - Rin + 30, { size: 18, align: 'center', color: C.muted });
+  hot(S, 'analyzer', cx, cy - R0, 34, 'Hemispherical analyser');
+  rrect(ctx, cx + R0 - 34, cy + 6, 68, 40, 8, '#1B2A3C', '#46607F'); text(ctx, 'detector', cx + R0, cy + 32, { size: 13, align: 'center', color: C.muted }); hot(S, 'detector', cx + R0, cy + 26, 26, null);
+  const q = seg(p, 0.04, 0.96); const maxBE = spec.maxBE; const beScan = maxBE * (1 - q);
+  let passing = false;
+  if (!d.threshold && maxBE > 0) {
+    const kScan = Math.max(1, d.hv - d.phi - beScan);
+    for (let k = 0; k < 10; k++) {
+      const P = 1.6, age = ((lt - k * 0.16) % P + P) % P; const r = clamp(R0 * (d.ke / kScan), 20, 400); const f = age / 1.2; if (f > 1) continue;
+      const inside = r > Rin + 4 && r < Rout - 4; const stopA = inside ? 1 : 0.35 + 0.1 * rnd(k, 2); const a = Math.PI + Math.PI * Math.min(f, stopA);
+      const rr = inside ? r : clamp(r, Rin - 2, Rout + 2); const x = cx + Math.cos(a) * rr, y = cy + Math.sin(a) * rr;
+      if (f <= stopA) dot(ctx, x, y, 5, C.electron);
+      else glow(ctx, x, y, 18, C.bad, 0.6 * (1 - (f - stopA)));
+      if (inside) passing = true;
+    }
+    if (passing) glow(ctx, cx + R0, cy + 26, 44, C.ok, 0.4 + 0.3 * Math.sin(lt * 20));
+  }
+  text(ctx, passing ? 'electrons at the pass energy reach the detector' : 'scanning the retarding voltage…', cx, 250, { size: 14, align: 'center', color: passing ? C.ok : C.muted });
+  const x0 = 700, y0 = 140, w = 520, h = 400; const xs = be => x0 + w * (1 - be / Math.max(1, maxBE));
+  const ticks = []; const step = maxBE > 600 ? 200 : maxBE > 250 ? 100 : 50; for (let b = 0; b <= maxBE; b += step) ticks.push({ x: xs(b), l: String(b) });
+  drawAxes(ctx, x0, y0, w, h, ticks, 'Binding energy (eV)  ←  increasing', 'Counts');
+  hot(S, 'peak', x0 + w - 40, y0 + 18, 10, null);
+  if (d.threshold || !spec.xs.length) { text(ctx, 'No photoelectron peaks: hν is too low', x0 + w / 2, y0 + h / 2, { size: 16, align: 'center', color: C.bad }); return; }
+  ctx.strokeStyle = C.electron; ctx.lineWidth = 2; ctx.beginPath(); let started = false;
+  for (let i = spec.xs.length - 1; i >= 0; i--) { const be = spec.xs[i]; if (be < beScan) break; const X = xs(be), Yv = y0 + h - (spec.ys[i] / spec.maxY) * h; if (!started) { ctx.moveTo(X, Yv); started = true; } else ctx.lineTo(X, Yv); }
+  ctx.stroke();
+  const sxp = xs(beScan); line(ctx, sxp, y0, sxp, y0 + h, C.photon, 1.5, [4, 4]); text(ctx, fmt(beScan, 0) + ' eV', sxp, y0 - 8, { size: 12, align: 'center', color: C.photon, font: MONO });
+  spec.peaks.forEach(L => { if (L.be >= beScan) { const i = Math.round(L.be / maxBE * (spec.xs.length - 1)); const X = xs(L.be), Yv = y0 + h - (spec.ys[i] / spec.maxY) * h; text(ctx, L.l, X, Math.max(y0 + 16, Yv - 10), { size: 12, weight: 700, align: 'center', color: C.text, bg: 'rgba(7,9,13,0.75)' }); if (d.main && L.l === d.main.l) hot(S, 'peak', X, Math.max(y0 + 16, Yv), 16, null); } });
+  const counts = Math.round(q * 184000 * (0.6 + d.el.Z / 60)); text(ctx, 'counts ' + counts.toLocaleString(), x0 + w, y0 - 8, { size: 12, align: 'right', color: C.muted, font: MONO });
+}
+
+/* ---------------- EELS ---------------- */
+function eels1(S) {
+  const { ctx, d, lt, p } = S; bgGrid(ctx); const X = 360;
+  const heat = d.src.thermionic ? 0.75 + 0.25 * Math.sin(lt * 9) : 0.4; const hc = d.src.id === 'w' ? '#FFD27A' : d.src.id === 'lab6' ? '#FF9E57' : '#9BD7FF';
+  glow(ctx, X, 104, 70, hc, 0.5 * heat); ctx.strokeStyle = hc; ctx.lineWidth = 4; ctx.beginPath(); ctx.moveTo(X - 26, 60); ctx.lineTo(X, 110); ctx.lineTo(X + 26, 60); ctx.stroke();
+  rrect(ctx, X - 70, 40, 140, 16, 4, '#26344A'); ctx.strokeStyle = '#4A5D7C'; ctx.lineWidth = 6; ctx.beginPath(); ctx.moveTo(X - 70, 56); ctx.lineTo(X - 70, 130); ctx.lineTo(X - 22, 130); ctx.moveTo(X + 70, 56); ctx.lineTo(X + 70, 130); ctx.lineTo(X + 22, 130); ctx.stroke();
+  hot(S, 'filament', X, 100, 30, d.src.thermionic ? 'Thermionic source' : 'Field-emission tip');
+  line(ctx, X - 160, 200, X - 16, 200, '#7C8DA6', 8); line(ctx, X + 16, 200, X + 160, 200, '#7C8DA6', 8); text(ctx, 'anode · ' + d.kv + ' kV', X + 170, 205, { size: 14, color: C.muted });
+  ctx.strokeStyle = '#3F5270'; ctx.lineWidth = 3; ctx.beginPath(); ctx.ellipse(X - 110, 320, 40, 16, 0, 0, 7); ctx.stroke(); ctx.beginPath(); ctx.ellipse(X + 110, 320, 40, 16, 0, 0, 7); ctx.stroke(); text(ctx, 'condenser lens', X + 170, 326, { size: 14, color: C.muted });
+  const hw = clamp(4 + d.ap * 0.34, 6, 72); line(ctx, X - 180, 430, X - hw, 430, '#B8C4D6', 7); line(ctx, X + hw, 430, X + 180, 430, '#B8C4D6', 7);
+  text(ctx, 'condenser aperture · ' + d.ap + ' µm', X + 190, 436, { size: 14, color: C.text }); hot(S, 'aperture', X + hw + 10, 430, 20, 'Condenser aperture');
+  let hotE = false;
+  for (let k = 0; k < 34; k++) {
+    const P = 1.9, age = ((lt * d.speedVis - k * 0.055) % P + P) % P; const x0 = (rnd(k, 1) - 0.5) * 36; const ang = (rnd(k, 2) - 0.5) * 1.3;
+    let y, x; const tA = 0.35;
+    if (age < tA) { const f = age / tA; y = 112 + 88 * f * f; x = X + x0 * (0.4 + f) + ang * 30 * f; }
+    else { const f = age - tA; y = 200 + f * 560; const xAt200 = X + x0 * 1.4 + ang * 30; x = y < 320 ? xAt200 + ang * (y - 200) * 0.9 : (xAt200 + ang * 108) - (xAt200 + ang * 108 - X) * clamp((y - 320) / 180, 0, 1.6); }
+    if (y > 430 && Math.abs(x - X) > hw) { if (y < 470) glow(ctx, clamp(x, X - 180, X + 180), 430, 14, C.bad, 0.7 * (1 - (y - 430) / 40)); continue; }
+    if (y > 700) continue;
+    dot(ctx, x, y, 3.5, C.electron, y > 200);
+    if (!hotE && y > 480 && y < 640) { hot(S, 'electron', x, y, 16, 'v = ' + fmt(d.beta, 2) + ' c'); hotE = true; }
+  }
+  readout(ctx, 800, 90, [['Source', d.src.label], ['Temperature', d.src.temp + ' K', hc], ['Accelerating voltage', d.kv + ' kV'], ['Speed v/c', fmt(d.beta, 3), C.electron], ['Wavelength λ', fmt(d.lambdaPm, 2) + ' pm'], ['Beam current', fmt(d.current, 2) + '×']], 'STAGE 1 · ELECTRON GUN');
+}
+function eels2(S) {
+  const { ctx, d, lt, p } = S; bgGrid(ctx); const X = 480; const th = 14 + d.tl * 30; const fy = 330;
+  const g = ctx.createLinearGradient(0, fy - th / 2, 0, fy + th / 2); g.addColorStop(0, '#2A3A52'); g.addColorStop(1, '#1A2536'); rrect(ctx, 120, fy - th / 2, 720, th, 4, g, '#4A5D7C');
+  hot(S, 'specimen', 200, fy, th / 2 + 8, 'Specimen · t/λ ' + fmt(d.tl, 2));
+  for (let r = 0; r < 4; r++) { const ph = ((lt * 1.2 + r / 4) % 1); ctx.strokeStyle = 'rgba(167,139,250,' + (0.6 * (1 - ph)) + ')'; ctx.lineWidth = 2; ctx.beginPath(); ctx.ellipse(X, fy, 20 + ph * 180, (th / 2) * (0.4 + ph * 0.6), 0, 0, 7); ctx.stroke(); }
+  hot(S, 'plasmon', X + 110, fy, 22, 'Plasmon');
+  const mix = [['zero', d.pZero, C.electron, 0], ['plasmon', d.pPl, C.violet, 0.12], ['multi', d.pMulti, '#C084FC', 0.22]];
+  let hz = false;
+  for (let k = 0; k < 40; k++) {
+    const P = 1.5, age = ((lt * d.speedVis - k * 0.04) % P + P) % P; const y = 40 + age * 460; const xo = (rnd(k, 3) - 0.5) * 16;
+    const u = rnd(k, 8); let cls = u < d.pZero ? 0 : u < d.pZero + d.pPl ? 1 : 2; const isCore = rnd(k, 12) < 0.07 && k % 5 === 0;
+    let x = X + xo; let col = C.electron;
+    if (y > fy) { const dev = isCore ? 0.28 : mix[cls][3] * (rnd(k, 6) > 0.5 ? 1 : -1); x += (y - fy) * dev; col = isCore ? C.energy : mix[cls][2]; }
+    if (y > 700) continue; dot(ctx, x, y, 3.6, col);
+    if (!hz && cls === 0 && !isCore && y > fy + 80 && y < fy + 220) { hot(S, 'electron', x, y, 14, null); hz = true; }
+  }
+  const ax = 1040, ay = 300; glow(ctx, ax, ay, 50, C.energy, 0.3); dot(ctx, ax, ay, 14, '#D9467A', false); text(ctx, d.el.edge.split(' ')[0], ax, ay + 5, { size: 13, weight: 700, align: 'center', color: '#fff' });
+  [52, 92, 132].forEach((r, i) => { ctx.strokeStyle = i === 0 ? 'rgba(255,107,154,0.5)' : '#26344A'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(ax, ay, r, 0, 7); ctx.stroke(); });
+  const cyc = (lt % 3) / 3; const bx = lerp(ax - 220, ax + 230, cyc); const by = ay - 70 + cyc * 40; dot(ctx, bx, by, 5, cyc < 0.5 ? C.electron : C.energy); if (cyc > 0.5) text(ctx, '−ΔE', bx, by - 14, { size: 13, align: 'center', color: C.energy, font: MONO });
+  const ej = seg(cyc, 0.45, 1); dot(ctx, ax + 52 * Math.cos(-2.2) + ej * 160, ay + 52 * Math.sin(-2.2) - ej * 60, 4.5, '#6FA8DC'); if (ej > 0) { ctx.setLineDash([3, 3]); ctx.strokeStyle = C.energy; ctx.beginPath(); ctx.arc(ax + 52 * Math.cos(-2.2), ay + 52 * Math.sin(-2.2), 7, 0, 7); ctx.stroke(); ctx.setLineDash([]); }
+  hot(S, 'core', ax, ay, 30, 'Inner-shell ionization'); text(ctx, 'ΔE ≥ ' + d.el.e0 + ' eV', ax, ay + 170, { size: 15, align: 'center', color: C.energy, font: MONO });
+  const bars = [['zero-loss', d.pZero, C.electron], ['single plasmon', d.pPl, C.violet], ['plural', d.pMulti, '#C084FC']]; const bx0 = 120, by0 = 560;
+  text(ctx, 'Where the beam electrons go (Poisson, t/λ = ' + fmt(d.tl, 2) + ')', bx0, by0 - 16, { size: 13, color: C.muted });
+  let acc = 0; bars.forEach(b => { const w = 720 * b[1]; rrect(ctx, bx0 + acc, by0, Math.max(0, w - 2), 22, 4, b[2]); if (w > 90) text(ctx, b[0] + ' ' + fmt(b[1] * 100, 0) + '%', bx0 + acc + 8, by0 + 16, { size: 12, weight: 700, color: '#07090D' }); acc += w; });
+  if (!d.thin) text(ctx, 'Thick specimen: plural scattering will bury the edges', 120, 620, { size: 14, color: C.photon });
+}
+function eels3(S) {
+  const { ctx, d, lt } = S; bgGrid(ctx);
+  const inY = 470, x0 = 60, xIn = 380, R = 240; const cxA = xIn, cyA = inY - R;
+  ctx.fillStyle = 'rgba(167,139,250,0.10)'; ctx.strokeStyle = 'rgba(167,139,250,0.6)'; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(cxA, cyA); ctx.arc(cxA, cyA, R + 60, Math.PI / 2, Math.PI / 2 - 0.66, true); ctx.closePath(); ctx.fill(); ctx.beginPath(); ctx.arc(cxA, cyA, R + 60, Math.PI / 2, Math.PI / 2 - 0.66, true); ctx.stroke();
+  for (let i = 0; i < 6; i++) { const a = Math.PI / 2 - 0.1 - i * 0.09; const r = R - 10 + (i % 2) * 45; const x = cxA + Math.cos(a) * r, y = cyA + Math.sin(a) * r; ctx.strokeStyle = 'rgba(167,139,250,0.7)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.arc(x, y, 8, 0, 7); ctx.stroke(); dot(ctx, x, y, 2, C.violet, false); }
+  text(ctx, 'B ⊙  magnetic field out of screen', cxA + 70, cyA + R + 100, { size: 13, color: C.violet });
+  hot(S, 'prism', cxA + 100, cyA + R - 10, 40, 'Magnetic prism');
+  const DX = 1110; line(ctx, DX, 60, DX, 660, '#5B6F8C', 6); text(ctx, 'detector', DX, 684, { size: 13, align: 'center', color: C.muted }); hot(S, 'edge', DX, 360, 24, null);
+  const classes = [{ n: '0 eV · zero-loss', e: 0, col: C.electron }, { n: fmt(d.el.ep, 0) + ' eV · plasmon', e: d.el.ep, col: C.violet }, { n: d.el.e0 + ' eV · ' + d.el.edge, e: d.el.e0, col: C.energy }];
+  const angOf = e => 0.35 + 0.12 * Math.log10(1 + e / 5);
+  const paths = classes.map(c => { const th = angOf(c.e); const ex = cxA + Math.sin(th) * R, ey = cyA + Math.cos(th) * R; const dx = Math.cos(th), dy = -Math.sin(th); const tHit = (DX - ex) / dx; return { c, th, ex, ey, dx, dy, hx: DX, hy: ey + dy * tHit }; });
+  paths.forEach(P => { line(ctx, P.ex, P.ey, P.hx, P.hy, P.c.col, 1, [3, 7]); dot(ctx, P.hx, P.hy, 7, P.c.col); text(ctx, P.c.n, P.hx - 16, P.hy + 5, { size: 13, align: 'right', color: C.text, bg: 'rgba(7,9,13,0.8)' }); });
+  line(ctx, x0, inY, xIn, inY, 'rgba(69,224,214,0.4)', 1, [3, 7]);
+  for (let k = 0; k < 24; k++) {
+    const u = rnd(k, 5); const ci = u < 0.72 ? 0 : u < 0.93 ? 1 : 2; const P = paths[ci]; const speed = 1.1 * d.speedVis; const age = ((lt * speed - k * 0.09) % 2.2 + 2.2) % 2.2;
+    const l1 = xIn - x0, l2 = R * P.th, l3 = Math.hypot(P.hx - P.ex, P.hy - P.ey); const s = age * 520; let x, y;
+    if (s < l1) { x = x0 + s; y = inY; } else if (s < l1 + l2) { const a = (s - l1) / R; x = cxA + Math.sin(a) * R; y = cyA + Math.cos(a) * R; } else if (s < l1 + l2 + l3) { const f = s - l1 - l2; x = P.ex + P.dx * f; y = P.ey + P.dy * f; } else continue;
+    dot(ctx, x, y, 3.8, s < l1 ? C.electron : P.c.col);
+  }
+  text(ctx, 'more energy lost → slower → tighter bend', 640, 690, { size: 14, align: 'center', color: C.muted });
+}
+function eels4(S) {
+  const { ctx, d, p, spec } = S; bgGrid(ctx); const q = ease(seg(p, 0.02, 0.9));
+  const sx = 70, sy = 110, sh = 520; rrect(ctx, sx, sy, 50, sh, 8, '#0B1119', '#33445E');
+  const allPts = spec.low.concat(spec.core); for (let i = 0; i < 52; i++) { const pt = allPts[Math.floor(i / 52 * allPts.length)]; const v = Math.log10(1 + pt[1] * q) / Math.log10(1 + spec.lowMax); ctx.fillStyle = 'rgba(69,224,214,' + clamp(v, 0.04, 1) + ')'; ctx.fillRect(sx + 6, sy + 6 + i * (sh - 12) / 52, 38, (sh - 12) / 52 - 2); }
+  text(ctx, 'CCD', sx + 25, sy + sh + 24, { size: 12, align: 'center', color: C.muted, font: MONO });
+  const panel = (x0, pts, xmin, xmax, ymax, gain, title, marks) => {
+    const y0 = 150, w = 430, h = 380; const X = e => x0 + (e - xmin) / (xmax - xmin) * w; const Y = v => y0 + h - clamp(v / ymax, 0, 1.05) * h;
+    const ticks = []; const st = (xmax - xmin) > 100 ? 50 : 10; for (let e = Math.ceil(xmin / st) * st; e <= xmax; e += st) ticks.push({ x: X(e), l: String(e) });
+    drawAxes(ctx, x0, y0, w, h, ticks, 'Energy loss (eV)', 'Counts'); text(ctx, title, x0, y0 - 10, { size: 13, weight: 700, color: C.text });
+    if (gain === 1) { ctx.strokeStyle = C.violet; ctx.lineWidth = 1.5; ctx.beginPath(); let st = false; pts.forEach(pt => { if (pt[0] < 3) return; const yy = Y(pt[1] * 10 * q); st ? ctx.lineTo(X(pt[0]), yy) : (ctx.moveTo(X(pt[0]), yy), st = true); }); ctx.stroke(); text(ctx, '×10', x0 + w - 6, y0 + 16, { size: 12, weight: 700, align: 'right', color: C.violet, font: MONO }); }
+    ctx.strokeStyle = C.electron; ctx.lineWidth = 2; ctx.beginPath(); pts.forEach((pt, i) => { const yy = Y(pt[1] * gain * q); i ? ctx.lineTo(X(pt[0]), yy) : ctx.moveTo(X(pt[0]), yy); }); ctx.stroke();
+    marks.forEach(m => { if (q > m.at) { text(ctx, m.l, X(m.e), Math.max(y0 + 14, Y(m.v * gain * q) - 12), { size: 12, weight: 700, align: 'center', color: C.text, bg: 'rgba(7,9,13,0.8)' }); if (m.hot) hot(S, m.hot, X(m.e), Math.max(y0 + 14, Y(m.v * gain * q)), 16, null); } });
+    return { X, Y };
+  };
+  const at = e => { const pt = spec.low.reduce((b, pt) => Math.abs(pt[0] - e) < Math.abs(b[0] - e) ? pt : b, spec.low[0]); return pt[1]; };
+  const atC = e => { const pt = spec.core.reduce((b, pt) => Math.abs(pt[0] - e) < Math.abs(b[0] - e) ? pt : b, spec.core[0]); return pt[1]; };
+  panel(210, spec.low, -5, 61, spec.lowMax, 1, 'Low loss', [{ e: 0, v: at(0), l: 'zero-loss', at: 0.05, hot: 'zlp' }, { e: d.el.ep, v: at(d.el.ep) * 10, l: 'plasmon', at: 0.25, hot: 'plasmon' }].concat(d.tl > 0.6 ? [{ e: 2 * d.el.ep, v: at(2 * d.el.ep) * 10, l: '2 plasmons', at: 0.35 }] : []));
+  panel(760, spec.core, d.el.e0 - 40, d.el.e0 + 120, spec.coreMax, spec.gain, 'Core loss  ×' + spec.gain, [{ e: d.el.e0 + (d.el.wl ? 1.5 : 4), v: atC(d.el.e0 + (d.el.wl ? 1.5 : 4)), l: d.el.edge, at: 0.45, hot: 'edge' }]);
+  text(ctx, 'counts ' + Math.round(q * 2.4e6 * d.current).toLocaleString(), 1190, 118, { size: 12, align: 'right', color: C.muted, font: MONO });
+}
+const SCENES = { xps: [xps1, xps2, xps3, xps4], eels: [eels1, eels2, eels3, eels4] };
+
+const {
+  useState,
+  useEffect,
+  useRef,
+  useMemo,
+  useCallback
+} = React;
+const Lc = window.LucideReact || {};
+function Icon({
+  name,
+  className
+}) {
+  const Cmp = Lc[name];
+  return Cmp ? /*#__PURE__*/React.createElement(Cmp, {
+    className: className || 'w-4 h-4',
+    "aria-hidden": "true",
+    strokeWidth: 2
+  }) : /*#__PURE__*/React.createElement("span", {
+    className: 'inline-block ' + (className || 'w-4 h-4'),
+    "aria-hidden": "true"
+  });
+}
+const mmss = s => {
+  s = Math.max(0, s || 0);
+  const m = Math.floor(s / 60),
+    r = Math.floor(s % 60);
+  return m + ':' + String(r).padStart(2, '0');
+};
+const canSpeak = () => {
+  try {
+    return 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
+  } catch (e) {
+    return false;
+  }
+};
+const MODES = {
+  xps: {
+    label: 'XPS',
+    long: 'X-ray photoelectron spectroscopy'
+  },
+  eels: {
+    label: 'EELS',
+    long: 'Electron energy-loss spectroscopy (TEM)'
+  }
+};
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+function Btn({
+  onClick,
+  label,
+  children,
+  active,
+  className,
+  disabled,
+  title
+}) {
+  return /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: onClick,
+    "aria-label": label,
+    title: title || label,
+    "aria-pressed": active === undefined ? undefined : !!active,
+    disabled: disabled,
+    className: 'inline-flex items-center justify-center gap-2 min-h-[40px] min-w-[40px] px-2.5 rounded-lg text-sm font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber disabled:opacity-40 disabled:cursor-not-allowed ' + (active ? 'bg-cyan/15 text-cyan ring-1 ring-cyan/40' : 'text-ink/90 hover:bg-white/5') + ' ' + (className || '')
+  }, children);
+}
+function Scrubber({
+  tl,
+  t,
+  onSeek,
+  fillRef
+}) {
+  const ref = useRef(null);
+  const [hover, setHover] = useState(null);
+  const drag = useRef(false);
+  const posToT = e => {
+    const r = ref.current.getBoundingClientRect();
+    return clamp((e.clientX - r.left) / r.width, 0, 1) * tl.total;
+  };
+  const chAt = tt => tl.chapters.findIndex(c => tt >= c.start && tt < c.end);
+  const onKey = e => {
+    const k = e.key;
+    let nt = null;
+    if (k === 'ArrowRight') nt = t + 5;else if (k === 'ArrowLeft') nt = t - 5;else if (k === 'Home') nt = 0;else if (k === 'End') nt = tl.total;else if (k === 'PageDown') nt = t + 15;else if (k === 'PageUp') nt = t - 15;
+    if (nt !== null) {
+      e.preventDefault();
+      e.stopPropagation();
+      onSeek(clamp(nt, 0, tl.total));
+    }
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "relative select-none pt-6 pb-1"
+  }, hover && /*#__PURE__*/React.createElement("div", {
+    className: "absolute -top-2 px-2 py-1 rounded-md bg-panel2 border border-line text-xs font-mono text-ink whitespace-nowrap pointer-events-none -translate-x-1/2",
+    style: {
+      left: hover.t / tl.total * 100 + '%'
+    }
+  }, mmss(hover.t), " \xB7 ", (tl.chapters[chAt(hover.t)] || tl.chapters[tl.chapters.length - 1]).title), /*#__PURE__*/React.createElement("div", {
+    ref: ref,
+    role: "slider",
+    tabIndex: 0,
+    "aria-label": "Seek",
+    "aria-valuemin": 0,
+    "aria-valuemax": Math.round(tl.total),
+    "aria-valuenow": Math.round(t),
+    "aria-valuetext": mmss(t) + ' of ' + mmss(tl.total),
+    onKeyDown: onKey,
+    onPointerDown: e => {
+      drag.current = true;
+      e.currentTarget.setPointerCapture(e.pointerId);
+      onSeek(posToT(e));
+    },
+    onPointerMove: e => {
+      const tt = posToT(e);
+      setHover({
+        t: tt
+      });
+      if (drag.current) onSeek(tt);
+    },
+    onPointerUp: e => {
+      drag.current = false;
+      try {
+        e.currentTarget.releasePointerCapture(e.pointerId);
+      } catch (x) {}
+    },
+    onPointerLeave: () => setHover(null),
+    className: "relative h-3 flex gap-[3px] cursor-pointer rounded-full focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber focus-visible:outline-offset-4"
+  }, tl.chapters.map((c, i) => /*#__PURE__*/React.createElement("div", {
+    key: i,
+    className: "h-full bg-white/10 rounded-full first:rounded-l-full",
+    style: {
+      flex: c.end - c.start
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    ref: fillRef,
+    className: "absolute left-0 top-0 h-full rounded-full bg-gradient-to-r from-cyan to-amber pointer-events-none",
+    style: {
+      width: t / tl.total * 100 + '%'
+    }
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute top-1/2 w-4 h-4 -mt-2 -ml-2 rounded-full bg-ink shadow-[0_0_0_4px_rgba(69,224,214,0.35)] pointer-events-none",
+    style: {
+      left: t / tl.total * 100 + '%'
+    }
+  })), /*#__PURE__*/React.createElement("div", {
+    className: "relative h-4 mt-1"
+  }, tl.chapters.map((c, i) => /*#__PURE__*/React.createElement("button", {
+    key: i,
+    type: "button",
+    onClick: () => onSeek(c.start + 0.01),
+    className: "absolute text-[11px] font-mono text-muted hover:text-ink -translate-x-0",
+    style: {
+      left: c.start / tl.total * 100 + '%'
+    },
+    "aria-label": 'Jump to chapter ' + (i + 1) + ': ' + c.title
+  }, i + 1))));
+}
+function MiniSpectrum({
+  mode,
+  d,
+  spec
+}) {
+  const [hov, setHov] = useState(null);
+  const Wd = 600,
+    Hd = 200,
+    pad = 28;
+  const panels = useMemo(() => {
+    if (mode === 'xps') {
+      if (!spec.xs.length) return [];
+      const pts = spec.xs.map((x, i) => [x, spec.ys[i]]);
+      return [{
+        pts,
+        xmin: spec.maxBE,
+        xmax: 0,
+        ymax: spec.maxY,
+        gain: 1,
+        x0: pad,
+        w: Wd - pad * 2,
+        unit: 'BE'
+      }];
+    }
+    return [{
+      pts: spec.low,
+      xmin: -5,
+      xmax: 61,
+      ymax: spec.lowMax,
+      gain: 1,
+      x0: pad,
+      w: 250,
+      unit: 'loss',
+      title: 'low loss'
+    }, {
+      pts: spec.core,
+      xmin: d.el.e0 - 40,
+      xmax: d.el.e0 + 120,
+      ymax: spec.coreMax,
+      gain: spec.gain,
+      x0: 310,
+      w: 262,
+      unit: 'loss',
+      title: 'core ×' + spec.gain
+    }];
+  }, [mode, d, spec]);
+  if (!panels.length) return /*#__PURE__*/React.createElement("div", {
+    className: "h-40 grid place-items-center text-sm text-bad bg-bg rounded-xl border border-line"
+  }, "No peaks: photon energy is below every binding energy.");
+  const path = P => P.pts.map((pt, i) => {
+    const x = P.x0 + (pt[0] - P.xmin) / (P.xmax - P.xmin) * P.w;
+    const y = Hd - pad - clamp(pt[1] * P.gain / P.ymax, 0, 1.05) * (Hd - pad * 2);
+    return (i ? 'L' : 'M') + x.toFixed(1) + ' ' + y.toFixed(1);
+  }).join('');
+  const onMove = e => {
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = (e.clientX - r.left) / r.width * Wd;
+    const P = panels.find(p => x >= p.x0 && x <= p.x0 + p.w);
+    if (!P) {
+      setHov(null);
+      return;
+    }
+    const E = P.xmin + (x - P.x0) / P.w * (P.xmax - P.xmin);
+    const pt = P.pts.reduce((b, q) => Math.abs(q[0] - E) < Math.abs(b[0] - E) ? q : b, P.pts[0]);
+    const px = P.x0 + (pt[0] - P.xmin) / (P.xmax - P.xmin) * P.w;
+    const py = Hd - pad - clamp(pt[1] * P.gain / P.ymax, 0, 1.05) * (Hd - pad * 2);
+    setHov({
+      px,
+      py,
+      E: pt[0],
+      v: pt[1],
+      unit: P.unit
+    });
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "relative"
+  }, /*#__PURE__*/React.createElement("svg", {
+    viewBox: '0 0 ' + Wd + ' ' + Hd,
+    className: "w-full h-auto bg-bg rounded-xl border border-line",
+    onPointerMove: onMove,
+    onPointerLeave: () => setHov(null),
+    role: "img",
+    "aria-label": mode === 'xps' ? 'XPS spectrum, counts versus binding energy' : 'EELS spectrum, counts versus energy loss'
+  }, panels.map((P, i) => /*#__PURE__*/React.createElement("g", {
+    key: i
+  }, /*#__PURE__*/React.createElement("line", {
+    x1: P.x0,
+    x2: P.x0 + P.w,
+    y1: Hd - pad,
+    y2: Hd - pad,
+    stroke: "#5C6B80",
+    strokeWidth: "1"
+  }), [0, 0.25, 0.5, 0.75, 1].map(f => /*#__PURE__*/React.createElement("text", {
+    key: f,
+    x: P.x0 + f * P.w,
+    y: Hd - 10,
+    fill: "#93A3B8",
+    fontSize: "10",
+    textAnchor: "middle",
+    fontFamily: "JetBrains Mono, monospace"
+  }, Math.round(P.xmin + f * (P.xmax - P.xmin)))), P.title && /*#__PURE__*/React.createElement("text", {
+    x: P.x0,
+    y: 16,
+    fill: "#93A3B8",
+    fontSize: "11",
+    fontFamily: "Instrument Sans, sans-serif"
+  }, P.title), /*#__PURE__*/React.createElement("path", {
+    d: path(P),
+    fill: "none",
+    stroke: "#45E0D6",
+    strokeWidth: "2",
+    strokeLinejoin: "round"
+  }))), hov && /*#__PURE__*/React.createElement("g", null, /*#__PURE__*/React.createElement("line", {
+    x1: hov.px,
+    x2: hov.px,
+    y1: pad - 6,
+    y2: Hd - pad,
+    stroke: "#E8EEF5",
+    strokeOpacity: "0.35"
+  }), /*#__PURE__*/React.createElement("circle", {
+    cx: hov.px,
+    cy: hov.py,
+    r: "5",
+    fill: "#45E0D6",
+    stroke: "#07090D",
+    strokeWidth: "2"
+  }))), hov && /*#__PURE__*/React.createElement("div", {
+    className: "absolute top-2 right-2 px-2 py-1 rounded-md bg-panel2 border border-line text-xs font-mono text-ink pointer-events-none"
+  }, (hov.unit === 'BE' ? 'BE ' : 'ΔE ') + fmt(hov.E, 1) + ' eV · ' + Math.round(hov.v).toLocaleString() + ' counts'));
+}
+function Field({
+  label,
+  htmlFor,
+  children,
+  hint
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-1.5"
+  }, /*#__PURE__*/React.createElement("label", {
+    htmlFor: htmlFor,
+    className: "text-xs font-semibold uppercase tracking-wider text-muted"
+  }, label), children, hint && /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-muted"
+  }, hint));
+}
+const selCls = 'w-full min-h-[40px] rounded-lg bg-bg border border-line px-3 text-sm text-ink focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber';
+function Segmented({
+  options,
+  value,
+  onChange,
+  label
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    role: "group",
+    "aria-label": label,
+    className: "flex flex-wrap gap-1 p-1 rounded-xl bg-bg border border-line"
+  }, options.map(o => /*#__PURE__*/React.createElement("button", {
+    key: o.v,
+    type: "button",
+    "aria-pressed": value === o.v,
+    onClick: () => onChange(o.v),
+    className: 'min-h-[34px] px-3 rounded-lg text-sm font-semibold ' + (value === o.v ? 'bg-ink text-bg' : 'text-muted hover:text-ink')
+  }, o.l)));
+}
+function Range({
+  id,
+  min,
+  max,
+  step,
+  value,
+  onChange,
+  fmtV
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-3"
+  }, /*#__PURE__*/React.createElement("input", {
+    id: id,
+    type: "range",
+    min: min,
+    max: max,
+    step: step,
+    value: value,
+    onChange: e => onChange(parseFloat(e.target.value)),
+    className: "flex-1 accent-cyan"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "w-20 text-right font-mono text-sm text-ink"
+  }, fmtV ? fmtV(value) : value));
+}
+function LabPanel({
+  mode,
+  params,
+  setParams,
+  d,
+  spec,
+  onReset
+}) {
+  const set = (k, v) => setParams(p => Object.assign({}, p, {
+    [k]: v
+  }));
+  const rows = mode === 'xps' ? [['hν', fmt(d.hv) + ' eV', 'text-amber'], ['Core level', d.target.l + ' · ' + fmt(d.target.be) + ' eV', 'text-cyan'], ['Kinetic energy', d.threshold ? 'no emission' : fmt(d.ke) + ' eV', d.threshold ? 'text-bad' : 'text-ok'], ['Electron speed', d.threshold ? '—' : fmt(d.v / 1e6, 2) + ' ×10⁶ m/s'], ['de Broglie λ', d.threshold ? '—' : fmt(d.deBroglieA, 3) + ' Å'], ['IMFP', d.threshold ? '—' : fmt(d.imfpNm, 2) + ' nm']] : [['Speed v/c', fmt(d.beta, 3), 'text-cyan'], ['Wavelength λ', fmt(d.lambdaPm, 2) + ' pm'], ['ZLP width', fmt(d.src.fwhm, 2) + ' eV'], ['Zero / single / plural', fmt(d.pZero * 100, 0) + ' / ' + fmt(d.pPl * 100, 0) + ' / ' + fmt(d.pMulti * 100, 0) + ' %', d.thin ? 'text-ok' : 'text-amber'], ['Beam current', fmt(d.current, 2) + '×'], ['Edge', d.el.edge + ' · ' + d.el.e0 + ' eV', 'text-rose']];
+  return /*#__PURE__*/React.createElement("section", {
+    "aria-labelledby": "lab-h",
+    className: "rounded-2xl bg-panel border border-line p-4 sm:p-5 flex flex-col gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between gap-3 flex-wrap"
+  }, /*#__PURE__*/React.createElement("h2", {
+    id: "lab-h",
+    className: "flex items-center gap-2 font-display text-2xl italic text-ink"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "FlaskConical",
+    className: "w-5 h-5 text-amber"
+  }), "Lab controls"), /*#__PURE__*/React.createElement(Btn, {
+    onClick: onReset,
+    label: "Reset lab values"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "RotateCcw"
+  }), " ", /*#__PURE__*/React.createElement("span", null, "Reset"))), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-muted -mt-2"
+  }, "Change a value while the video plays \u2014 the animation, electron speed and spectrum update immediately."), mode === 'xps' ? /*#__PURE__*/React.createElement("div", {
+    className: "grid sm:grid-cols-2 gap-4"
+  }, /*#__PURE__*/React.createElement(Field, {
+    label: "X-ray source"
+  }, /*#__PURE__*/React.createElement(Segmented, {
+    label: "X-ray source",
+    value: params.source,
+    onChange: v => set('source', v),
+    options: XPS_SOURCES.map(s => ({
+      v: s.id,
+      l: s.label
+    }))
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Element",
+    htmlFor: "x-el"
+  }, /*#__PURE__*/React.createElement("select", {
+    id: "x-el",
+    className: selCls,
+    value: params.element,
+    onChange: e => set('element', e.target.value)
+  }, Object.keys(XPS_ELEMENTS).map(k => /*#__PURE__*/React.createElement("option", {
+    key: k,
+    value: k
+  }, k, " \u2014 ", XPS_ELEMENTS[k].name, " (Z ", XPS_ELEMENTS[k].Z, ")")))), params.source === 'custom' && /*#__PURE__*/React.createElement(Field, {
+    label: "Custom photon energy (eV)",
+    htmlFor: "x-hv",
+    hint: "Try going below the binding energy to see emission stop."
+  }, /*#__PURE__*/React.createElement(Range, {
+    id: "x-hv",
+    min: 50,
+    max: 2000,
+    step: 1,
+    value: params.customHv,
+    onChange: v => set('customHv', v),
+    fmtV: v => v + ' eV'
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Spectrometer work function \u03C6 (eV)",
+    htmlFor: "x-phi"
+  }, /*#__PURE__*/React.createElement(Range, {
+    id: "x-phi",
+    min: 2,
+    max: 7,
+    step: 0.1,
+    value: params.phi,
+    onChange: v => set('phi', v),
+    fmtV: v => fmt(v, 1)
+  }))) : /*#__PURE__*/React.createElement("div", {
+    className: "grid sm:grid-cols-2 gap-4"
+  }, /*#__PURE__*/React.createElement(Field, {
+    label: "Electron source",
+    htmlFor: "e-src"
+  }, /*#__PURE__*/React.createElement("select", {
+    id: "e-src",
+    className: selCls,
+    value: params.source,
+    onChange: e => set('source', e.target.value)
+  }, EELS_SOURCES.map(s => /*#__PURE__*/React.createElement("option", {
+    key: s.id,
+    value: s.id
+  }, s.label)))), /*#__PURE__*/React.createElement(Field, {
+    label: "Accelerating voltage"
+  }, /*#__PURE__*/React.createElement(Segmented, {
+    label: "Accelerating voltage",
+    value: params.kv,
+    onChange: v => set('kv', v),
+    options: [80, 120, 200, 300].map(v => ({
+      v,
+      l: v + ' kV'
+    }))
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Specimen element",
+    htmlFor: "e-el"
+  }, /*#__PURE__*/React.createElement("select", {
+    id: "e-el",
+    className: selCls,
+    value: params.element,
+    onChange: e => set('element', e.target.value)
+  }, Object.keys(EELS_ELEMENTS).map(k => /*#__PURE__*/React.createElement("option", {
+    key: k,
+    value: k
+  }, EELS_ELEMENTS[k].name, " \u2014 ", EELS_ELEMENTS[k].edge, " ", EELS_ELEMENTS[k].e0, " eV")))), /*#__PURE__*/React.createElement(Field, {
+    label: "Condenser aperture (\xB5m)"
+  }, /*#__PURE__*/React.createElement(Segmented, {
+    label: "Condenser aperture",
+    value: params.aperture,
+    onChange: v => set('aperture', v),
+    options: [20, 50, 100, 150].map(v => ({
+      v,
+      l: v + ''
+    }))
+  })), /*#__PURE__*/React.createElement(Field, {
+    label: "Specimen thickness t/\u03BB",
+    htmlFor: "e-tl",
+    hint: d.thin ? 'Thin: edges stay clear.' : 'Thick: plural scattering buries edges.'
+  }, /*#__PURE__*/React.createElement(Range, {
+    id: "e-tl",
+    min: 0.05,
+    max: 2,
+    step: 0.05,
+    value: params.tl,
+    onChange: v => set('tl', v),
+    fmtV: v => fmt(v, 2)
+  }))), /*#__PURE__*/React.createElement("dl", {
+    className: "grid grid-cols-2 sm:grid-cols-3 gap-2"
+  }, rows.map(r => /*#__PURE__*/React.createElement("div", {
+    key: r[0],
+    className: "rounded-xl bg-bg border border-line px-3 py-2"
+  }, /*#__PURE__*/React.createElement("dt", {
+    className: "text-[11px] uppercase tracking-wider text-muted"
+  }, r[0]), /*#__PURE__*/React.createElement("dd", {
+    className: 'font-mono text-sm mt-0.5 ' + (r[2] || 'text-ink')
+  }, r[1])))), /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center justify-between mb-1.5"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-xs font-semibold uppercase tracking-wider text-muted"
+  }, "Live spectrum"), /*#__PURE__*/React.createElement("span", {
+    className: "text-xs text-muted"
+  }, mode === 'xps' ? 'binding energy (eV), high → low' : 'energy loss (eV)')), /*#__PURE__*/React.createElement(MiniSpectrum, {
+    mode: mode,
+    d: d,
+    spec: spec
+  })));
+}
+function ScriptPanel({
+  tl,
+  t,
+  onSeek,
+  playing
+}) {
+  const box = useRef(null);
+  const activeRef = useRef(null);
+  const active = tl.sentences.find(s => t >= s.t0 && t < s.t1) || (t >= tl.total ? tl.sentences[tl.sentences.length - 1] : null);
+  useEffect(() => {
+    const el = activeRef.current,
+      b = box.current;
+    if (!el || !b || !playing) return;
+    const top = el.offsetTop - b.offsetTop;
+    if (top < b.scrollTop + 20 || top > b.scrollTop + b.clientHeight - 80) b.scrollTo({
+      top: top - 60,
+      behavior: 'smooth'
+    });
+  }, [active && active.t0, playing]);
+  return /*#__PURE__*/React.createElement("aside", {
+    "aria-labelledby": "script-h",
+    className: "rounded-2xl bg-panel border border-line flex flex-col min-h-0 lg:max-h-[calc(100vh-140px)]"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "px-4 pt-4 pb-3 border-b border-line"
+  }, /*#__PURE__*/React.createElement("h2", {
+    id: "script-h",
+    className: "flex items-center gap-2 font-display text-2xl italic text-ink"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "ListVideo",
+    className: "w-5 h-5 text-cyan"
+  }), "Narration script"), /*#__PURE__*/React.createElement("p", {
+    className: "text-xs text-muted mt-1"
+  }, "Select any sentence to jump the video to that frame.")), /*#__PURE__*/React.createElement("div", {
+    ref: box,
+    className: "overflow-y-auto p-3 flex flex-col gap-4 max-h-[420px] lg:max-h-none"
+  }, tl.chapters.map((c, ci) => /*#__PURE__*/React.createElement("div", {
+    key: ci
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-baseline justify-between px-1 mb-1"
+  }, /*#__PURE__*/React.createElement("h3", {
+    className: "text-sm font-semibold text-ink"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "font-mono text-amber mr-2"
+  }, String(ci + 1).padStart(2, '0')), c.title), /*#__PURE__*/React.createElement("span", {
+    className: "font-mono text-[11px] text-muted"
+  }, mmss(c.start))), /*#__PURE__*/React.createElement("ol", {
+    className: "flex flex-col gap-1"
+  }, c.sentences.map((s, si) => {
+    const on = active === s;
+    return /*#__PURE__*/React.createElement("li", {
+      key: si
+    }, /*#__PURE__*/React.createElement("button", {
+      type: "button",
+      ref: on ? activeRef : null,
+      onClick: () => onSeek(s.t0 + 0.01),
+      "aria-current": on ? 'true' : undefined,
+      className: 'w-full text-left rounded-lg px-3 py-2 text-sm leading-relaxed transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber ' + (on ? 'bg-cyan/10 text-ink ring-1 ring-cyan/40' : t > s.t1 ? 'text-muted hover:bg-white/5' : 'text-ink/85 hover:bg-white/5')
+    }, /*#__PURE__*/React.createElement("span", {
+      className: "font-mono text-[11px] text-muted mr-2"
+    }, mmss(s.t0)), s.text));
+  }))))));
+}
+function ScriptModal({
+  mode,
+  chapters,
+  onApply,
+  onReset,
+  onClose
+}) {
+  const [txt, setTxt] = useState(scriptToText(chapters));
+  const [err, setErr] = useState('');
+  const [note, setNote] = useState('');
+  const first = useRef(null);
+  useEffect(() => {
+    first.current && first.current.focus();
+  }, []);
+  const onFile = e => {
+    const f = e.target.files && e.target.files[0];
+    e.target.value = '';
+    if (!f) return;
+    if (f.size > 2e6) {
+      setErr('That file is over 2 MB. Use a plain-text script file.');
+      return;
+    }
+    const r = new FileReader();
+    r.onload = () => {
+      setTxt(String(r.result || ''));
+      setErr('');
+      setNote('Loaded ' + f.name + '. Review it, then press Apply.');
+    };
+    r.onerror = () => setErr('The file could not be read.');
+    r.readAsText(f);
+  };
+  const apply = () => {
+    const res = parseScript(txt, DEFAULT_SCRIPTS[mode]);
+    if (res.error) {
+      setErr(res.error);
+      return;
+    }
+    onApply(res.chapters, res.note);
+  };
+  return /*#__PURE__*/React.createElement("div", {
+    className: "fixed inset-0 z-50 bg-black/70 grid place-items-center p-4",
+    onKeyDown: e => {
+      if (e.key === 'Escape') onClose();
+    },
+    onClick: e => {
+      if (e.target === e.currentTarget) onClose();
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    role: "dialog",
+    "aria-modal": "true",
+    "aria-labelledby": "sm-h",
+    className: "w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-2xl bg-panel border border-line p-5 flex flex-col gap-4"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-start justify-between gap-4"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("h2", {
+    id: "sm-h",
+    className: "font-display text-3xl italic text-ink"
+  }, "Load a TTS script \xB7 ", MODES[mode].label), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-muted mt-1"
+  }, "Start each chapter with a line like ", /*#__PURE__*/React.createElement("span", {
+    className: "font-mono text-ink"
+  }, "# Photoelectron emission"), ". The first four chapters drive the four animated stages; without headings, sentences are shared out across the stages. Timestamps from .srt or .vtt files are removed. Timing follows each sentence\u2019s length.")), /*#__PURE__*/React.createElement(Btn, {
+    onClick: onClose,
+    label: "Close"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "X"
+  }))), /*#__PURE__*/React.createElement("label", {
+    htmlFor: "sm-txt",
+    className: "sr-only"
+  }, "Narration script"), /*#__PURE__*/React.createElement("textarea", {
+    id: "sm-txt",
+    ref: first,
+    value: txt,
+    onChange: e => {
+      setTxt(e.target.value);
+      setErr('');
+    },
+    rows: 14,
+    className: "w-full rounded-xl bg-bg border border-line p-3 font-mono text-sm text-ink leading-relaxed focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber"
+  }), err && /*#__PURE__*/React.createElement("p", {
+    role: "alert",
+    className: "text-sm text-bad"
+  }, err), note && !err && /*#__PURE__*/React.createElement("p", {
+    role: "status",
+    className: "text-sm text-ok"
+  }, note), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap gap-2 justify-between"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex gap-2"
+  }, /*#__PURE__*/React.createElement("label", {
+    className: "inline-flex items-center gap-2 min-h-[40px] px-3 rounded-lg border border-line text-sm font-semibold text-ink hover:bg-white/5 cursor-pointer focus-within:outline focus-within:outline-2 focus-within:outline-amber"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "Upload"
+  }), "Upload .txt / .md / .srt / .vtt", /*#__PURE__*/React.createElement("input", {
+    type: "file",
+    accept: ".txt,.md,.srt,.vtt,text/plain",
+    className: "sr-only",
+    onChange: onFile
+  })), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      onReset();
+      onClose();
+    },
+    label: "Restore the built-in script"
+  }, "Restore default")), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: apply,
+    className: "min-h-[40px] px-4 rounded-lg bg-cyan text-bg font-semibold hover:bg-cyan/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber"
+  }, "Apply script"))));
+}
+function Player() {
+  const [mode, setMode] = useState('xps');
+  const [params, setParamsAll] = useState({
+    xps: Object.assign({}, XPS_DEFAULT),
+    eels: Object.assign({}, EELS_DEFAULT)
+  });
+  const [scripts, setScripts] = useState({
+    xps: DEFAULT_SCRIPTS.xps,
+    eels: DEFAULT_SCRIPTS.eels
+  });
+  const [playing, setPlaying] = useState(false);
+  const [speed, setSpeed] = useState(1);
+  const [captions, setCaptions] = useState(true);
+  const [overlays, setOverlays] = useState(true);
+  const [voice, setVoice] = useState(false);
+  const [tUI, setTUI] = useState(0);
+  const [pop, setPop] = useState(null);
+  const [hover, setHover] = useState(null);
+  const [modal, setModal] = useState(false);
+  const [toast, setToast] = useState('');
+  const tl = useMemo(() => buildTimeline(scripts[mode]), [scripts, mode]);
+  const d0 = useMemo(() => mode === 'xps' ? xpsDerived(params.xps) : eelsDerived(params.eels), [mode, params]);
+  const spec = useMemo(() => mode === 'xps' ? xpsSpectrum(d0) : eelsSpectrum(d0), [mode, d0]);
+  const d = useMemo(() => Object.assign({}, d0, {
+    gain: spec.gain
+  }), [d0, spec]);
+  const tRef = useRef(0),
+    playRef = useRef(false),
+    speedRef = useRef(1),
+    tlRef = useRef(tl),
+    dRef = useRef(d),
+    specRef = useRef(spec),
+    ovRef = useRef(true),
+    modeRef = useRef(mode),
+    hsRef = useRef([]),
+    hoverRef = useRef(null);
+  const canvasRef = useRef(null),
+    wrapRef = useRef(null),
+    fillRef = useRef(null),
+    playerRef = useRef(null),
+    lastUI = useRef(-1);
+  playRef.current = playing;
+  speedRef.current = speed;
+  tlRef.current = tl;
+  dRef.current = d;
+  specRef.current = spec;
+  ovRef.current = overlays;
+  modeRef.current = mode;
+  hoverRef.current = hover;
+  const draw = useCallback(() => {
+    const cv = canvasRef.current;
+    if (!cv) return;
+    const ctx = cv.getContext('2d');
+    const T = tlRef.current;
+    const t = clamp(tRef.current, 0, T.total);
+    let ci = T.chapters.findIndex(c => t >= c.start && t < c.end);
+    if (ci < 0) ci = T.chapters.length - 1;
+    const ch = T.chapters[ci];
+    const p = clamp((t - ch.start) / Math.max(0.01, ch.end - ch.start), 0, 1);
+    const scale = cv.width / W;
+    ctx.setTransform(scale, 0, 0, scale, 0, 0);
+    const S = {
+      ctx,
+      t,
+      lt: t - ch.start,
+      p,
+      d: dRef.current,
+      spec: specRef.current,
+      hs: [],
+      ov: ovRef.current
+    };
+    try {
+      SCENES[modeRef.current][Math.min(ci, 3)](S);
+    } catch (e) {
+      ctx.fillStyle = C.bg;
+      ctx.fillRect(0, 0, W, H);
+      text(ctx, 'This frame could not be drawn: ' + e.message, 40, 60, {
+        color: C.bad
+      });
+    }
+    hsRef.current = S.hs;
+    const hv = hoverRef.current;
+    if (hv) {
+      const h = S.hs.find(x => x.id === hv.id);
+      if (h) {
+        ctx.strokeStyle = C.photon;
+        ctx.lineWidth = 2;
+        ctx.setLineDash([4, 4]);
+        ctx.beginPath();
+        ctx.arc(h.x, h.y, h.r + 6, 0, 7);
+        ctx.stroke();
+        ctx.setLineDash([]);
+      }
+    }
+    const intro = t - ch.start;
+    if (intro < 2.2) {
+      const a = intro < 0.3 ? intro / 0.3 : 1 - seg(intro, 1.6, 2.2);
+      ctx.globalAlpha = a;
+      const g = ctx.createLinearGradient(0, H - 200, 0, H);
+      g.addColorStop(0, 'rgba(7,9,13,0)');
+      g.addColorStop(1, 'rgba(7,9,13,0.9)');
+      ctx.fillStyle = g;
+      ctx.fillRect(0, H - 200, W, 200);
+      ctx.globalAlpha = 1;
+      text(ctx, 'STAGE ' + (ci + 1), 60, H - 128, {
+        size: 15,
+        weight: 700,
+        font: MONO,
+        color: C.photon,
+        alpha: a
+      });
+      text(ctx, ch.title, 60, H - 84, {
+        size: 46,
+        font: SERIF,
+        color: C.text,
+        alpha: a
+      });
+    }
+    if (fillRef.current) fillRef.current.style.width = t / T.total * 100 + '%';
+  }, []);
+  useEffect(() => {
+    let raf,
+      last = performance.now();
+    const tick = now => {
+      const dt = Math.min(0.1, (now - last) / 1000);
+      last = now;
+      if (playRef.current) {
+        tRef.current += dt * speedRef.current;
+        if (tRef.current >= tlRef.current.total) {
+          tRef.current = tlRef.current.total;
+          playRef.current = false;
+          setPlaying(false);
+        }
+      }
+      draw();
+      const q = Math.floor(tRef.current * 12);
+      if (q !== lastUI.current) {
+        lastUI.current = q;
+        setTUI(tRef.current);
+      }
+      raf = requestAnimationFrame(tick);
+    };
+    raf = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(raf);
+  }, [draw]);
+  useEffect(() => {
+    const cv = canvasRef.current,
+      wr = wrapRef.current;
+    if (!cv || !wr) return;
+    const fit = () => {
+      const dpr = Math.min(2, window.devicePixelRatio || 1);
+      const w = wr.clientWidth;
+      cv.width = Math.round(w * dpr);
+      cv.height = Math.round(w * dpr * H / W);
+      draw();
+    };
+    fit();
+    let ro;
+    if (window.ResizeObserver) {
+      ro = new ResizeObserver(fit);
+      ro.observe(wr);
+    } else window.addEventListener('resize', fit);
+    return () => {
+      ro ? ro.disconnect() : window.removeEventListener('resize', fit);
+    };
+  }, [draw]);
+  useEffect(() => {
+    const v = () => {
+      if (document.hidden) setPlaying(false);
+    };
+    document.addEventListener('visibilitychange', v);
+    return () => document.removeEventListener('visibilitychange', v);
+  }, []);
+  const seek = useCallback(nt => {
+    tRef.current = clamp(nt, 0, tlRef.current.total);
+    setTUI(tRef.current);
+    setPop(null);
+    try {
+      canSpeak() && window.speechSynthesis.cancel();
+    } catch (e) {}
+    lastSpoken.current = null;
+  }, []);
+  const togglePlay = useCallback(() => {
+    setPop(null);
+    if (tRef.current >= tlRef.current.total - 0.05) tRef.current = 0;
+    setPlaying(p => !p);
+  }, []);
+  const chapterIdx = Math.max(0, tl.chapters.findIndex(c => tUI >= c.start && tUI < c.end));
+  const ended = tUI >= tl.total - 0.02 && !playing;
+  const curSentence = tl.sentences.find(s => tUI >= s.t0 && tUI < s.t1) || null;
+  const lastSpoken = useRef(null);
+  useEffect(() => {
+    if (!voice || !playing || !curSentence || !canSpeak()) return;
+    if (lastSpoken.current === curSentence) return;
+    lastSpoken.current = curSentence;
+    try {
+      window.speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(curSentence.text);
+      u.rate = clamp(speed * 1.05, 0.5, 2);
+      u.lang = 'en-US';
+      window.speechSynthesis.speak(u);
+    } catch (e) {}
+  }, [voice, playing, curSentence, speed]);
+  useEffect(() => {
+    if (!playing || !voice) {
+      try {
+        canSpeak() && window.speechSynthesis.cancel();
+      } catch (e) {}
+      lastSpoken.current = null;
+    }
+  }, [playing, voice]);
+  const toCanvas = e => {
+    const r = canvasRef.current.getBoundingClientRect();
+    return {
+      x: (e.clientX - r.left) * W / r.width,
+      y: (e.clientY - r.top) * H / r.height,
+      px: (e.clientX - r.left) / r.width,
+      py: (e.clientY - r.top) / r.height
+    };
+  };
+  const hitAt = pt => {
+    let best = null,
+      bd = 1e9;
+    hsRef.current.forEach(h => {
+      const dd = Math.hypot(h.x - pt.x, h.y - pt.y);
+      if (dd < h.r + 14 && dd < bd) {
+        bd = dd;
+        best = h;
+      }
+    });
+    return best;
+  };
+  const onCanvasClick = e => {
+    const pt = toCanvas(e);
+    const h = hitAt(pt);
+    if (h) {
+      const card = conceptCard(mode, h.id, d);
+      if (card) {
+        setPlaying(false);
+        setPop({
+          card,
+          x: pt.px,
+          y: pt.py,
+          id: h.id
+        });
+        return;
+      }
+    }
+    setPop(null);
+    togglePlay();
+  };
+  const onCanvasMove = e => {
+    const h = hitAt(toCanvas(e));
+    const id = h ? h.id : null;
+    if ((hover && hover.id) !== id) setHover(h ? {
+      id,
+      label: h.label || (conceptCard(mode, h.id, d) || {}).title
+    } : null);
+  };
+  const switchMode = m => {
+    if (m === mode) return;
+    setPlaying(false);
+    tRef.current = 0;
+    setTUI(0);
+    setPop(null);
+    setMode(m);
+  };
+  const onKey = e => {
+    if (e.target.closest && e.target.closest('input,select,textarea,[role="slider"]')) return;
+    const k = e.key.toLowerCase();
+    const T = tl.total;
+    if (k === ' ' || k === 'k') {
+      e.preventDefault();
+      togglePlay();
+    } else if (k === 'arrowright' || k === 'l') {
+      e.preventDefault();
+      seek(tRef.current + (k === 'l' ? 10 : 5));
+    } else if (k === 'arrowleft' || k === 'j') {
+      e.preventDefault();
+      seek(tRef.current - (k === 'j' ? 10 : 5));
+    } else if (k === 'home') seek(0);else if (k === 'end') seek(T);else if (/^[1-4]$/.test(k) && tl.chapters[+k - 1]) seek(tl.chapters[+k - 1].start + 0.01);else if (k === 'c') setCaptions(v => !v);else if (k === 'o') setOverlays(v => !v);else if (k === '>' || k === '.') setSpeed(s => SPEEDS[Math.min(SPEEDS.length - 1, SPEEDS.indexOf(s) + 1)]);else if (k === '<' || k === ',') setSpeed(s => SPEEDS[Math.max(0, SPEEDS.indexOf(s) - 1)]);else if (k === 'escape') setPop(null);
+  };
+  const fullscreen = () => {
+    const el = playerRef.current;
+    try {
+      if (document.fullscreenElement) document.exitFullscreen();else if (el.requestFullscreen) el.requestFullscreen().catch(() => setToast('Full screen isn’t available here.'));else setToast('Full screen isn’t available here.');
+    } catch (e) {
+      setToast('Full screen isn’t available here.');
+    }
+  };
+  useEffect(() => {
+    if (!toast) return;
+    const id = setTimeout(() => setToast(''), 3500);
+    return () => clearTimeout(id);
+  }, [toast]);
+  const setParams = fn => setParamsAll(all => Object.assign({}, all, {
+    [mode]: fn(all[mode])
+  }));
+  const words = curSentence ? curSentence.words : [];
+  const wIdx = curSentence ? Math.floor(clamp((tUI - curSentence.t0) / (curSentence.t1 - curSentence.t0 - 0.3), 0, 0.999) * words.length) : -1;
+  return /*#__PURE__*/React.createElement("div", {
+    className: "min-h-screen bg-bg text-ink font-sans px-4 sm:px-6 py-5"
+  }, /*#__PURE__*/React.createElement("header", {
+    className: "max-w-[1500px] mx-auto flex flex-wrap items-end justify-between gap-4 mb-5"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "font-mono text-xs uppercase tracking-[0.2em] text-amber"
+  }, "Interactive lecture \xB7 spectroscopy"), /*#__PURE__*/React.createElement("h1", {
+    className: "font-display italic text-4xl sm:text-5xl leading-none text-ink mt-1"
+  }, "Spectroscopy in Motion"), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-muted mt-2"
+  }, MODES[mode].long, " \u2014 watch it, pause on anything that moves, then change the physics.")), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap items-center gap-2"
+  }, /*#__PURE__*/React.createElement(Segmented, {
+    label: "Technique",
+    value: mode,
+    onChange: switchMode,
+    options: [{
+      v: 'xps',
+      l: 'XPS · photoelectric'
+    }, {
+      v: 'eels',
+      l: 'EELS · TEM'
+    }]
+  }), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      setPlaying(false);
+      setModal(true);
+    },
+    label: "Load a TTS narration script"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "FileText"
+  }), /*#__PURE__*/React.createElement("span", {
+    className: "hidden sm:inline"
+  }, "Load script")))), /*#__PURE__*/React.createElement("div", {
+    className: "max-w-[1500px] mx-auto grid gap-5 lg:grid-cols-[minmax(0,1fr)_360px] items-start"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-col gap-5 min-w-0"
+  }, /*#__PURE__*/React.createElement("section", {
+    ref: playerRef,
+    tabIndex: 0,
+    onKeyDown: onKey,
+    "aria-label": 'Interactive video: ' + MODES[mode].long,
+    className: "rounded-2xl bg-panel border border-line overflow-hidden focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber [&:fullscreen]:rounded-none [&:fullscreen]:flex [&:fullscreen]:flex-col [&:fullscreen]:justify-center"
+  }, /*#__PURE__*/React.createElement("div", {
+    ref: wrapRef,
+    className: "relative w-full bg-bg",
+    style: {
+      aspectRatio: '16 / 9'
+    }
+  }, /*#__PURE__*/React.createElement("canvas", {
+    ref: canvasRef,
+    className: 'absolute inset-0 w-full h-full ' + (hover ? 'cursor-pointer' : 'cursor-default'),
+    onClick: onCanvasClick,
+    onPointerMove: onCanvasMove,
+    onPointerLeave: () => setHover(null),
+    role: "img",
+    "aria-label": 'Stage ' + (chapterIdx + 1) + ': ' + (tl.chapters[chapterIdx] || {}).title + '. ' + (curSentence ? curSentence.text : '')
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "absolute top-3 left-3 flex items-center gap-2 pointer-events-none"
+  }, /*#__PURE__*/React.createElement("span", {
+    className: "px-2.5 py-1 rounded-full bg-black/60 border border-line font-mono text-[11px] text-amber"
+  }, MODES[mode].label, " \xB7 ", chapterIdx + 1, "/", tl.chapters.length), hover && hover.label && /*#__PURE__*/React.createElement("span", {
+    className: "px-2.5 py-1 rounded-full bg-black/70 border border-amber/50 text-xs text-ink flex items-center gap-1.5"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "MousePointerClick",
+    className: "w-3.5 h-3.5 text-amber"
+  }), hover.label, " \u2014 click for details")), captions && curSentence && /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-x-0 bottom-4 flex justify-center px-4 pointer-events-none",
+    "aria-live": "off"
+  }, /*#__PURE__*/React.createElement("p", {
+    key: curSentence.t0,
+    className: "cap-in max-w-[88%] text-center text-base sm:text-xl leading-snug font-medium px-4 py-2 rounded-xl bg-black/75 backdrop-blur-sm"
+  }, words.map((w, i) => /*#__PURE__*/React.createElement("span", {
+    key: i,
+    className: i <= wIdx ? 'text-ink' : 'text-ink/45'
+  }, w, ' ')))), pop && /*#__PURE__*/React.createElement("div", {
+    role: "dialog",
+    "aria-label": pop.card.title,
+    className: "absolute z-20 w-[min(360px,86%)] rounded-2xl bg-panel2/95 backdrop-blur border border-amber/40 shadow-2xl p-4 flex flex-col gap-2 pop-in",
+    style: {
+      left: 'clamp(8px, calc(' + pop.x * 100 + '% - 180px), calc(100% - min(360px,86%) - 8px))',
+      top: pop.y > 0.5 ? 'auto' : 'calc(' + pop.y * 100 + '% + 16px)',
+      bottom: pop.y > 0.5 ? 'calc(' + (1 - pop.y) * 100 + '% + 16px)' : 'auto'
+    }
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-start justify-between gap-2"
+  }, /*#__PURE__*/React.createElement("div", null, /*#__PURE__*/React.createElement("p", {
+    className: "font-mono text-[11px] uppercase tracking-wider text-amber"
+  }, pop.card.kind, " \xB7 paused"), /*#__PURE__*/React.createElement("h3", {
+    className: "font-display italic text-2xl text-ink leading-tight"
+  }, pop.card.title)), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setPop(null),
+    label: "Close concept card"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "X"
+  }))), /*#__PURE__*/React.createElement("p", {
+    className: "text-sm text-ink/90 leading-relaxed"
+  }, pop.card.body), /*#__PURE__*/React.createElement("p", {
+    className: "font-mono text-[13px] text-cyan bg-bg rounded-lg border border-line px-3 py-2 leading-relaxed"
+  }, pop.card.formula), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      setPop(null);
+      setPlaying(true);
+    },
+    className: "self-start min-h-[36px] px-3 rounded-lg bg-ink text-bg text-sm font-semibold inline-flex items-center gap-1.5"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "Play",
+    className: "w-3.5 h-3.5"
+  }), "Resume")), ended && /*#__PURE__*/React.createElement("div", {
+    className: "absolute inset-0 grid place-items-center bg-black/55"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "text-center flex flex-col items-center gap-3"
+  }, /*#__PURE__*/React.createElement("p", {
+    className: "font-display italic text-3xl text-ink"
+  }, "End of the lesson"), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: () => {
+      seek(0);
+      setPlaying(true);
+    },
+    className: "min-h-[44px] px-5 rounded-xl bg-cyan text-bg font-semibold inline-flex items-center gap-2"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "RotateCcw"
+  }), "Replay"))), !playing && !ended && tUI < 0.05 && !pop && /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: togglePlay,
+    "aria-label": "Play",
+    className: "absolute inset-0 m-auto w-20 h-20 rounded-full bg-cyan text-bg grid place-items-center shadow-[0_0_0_12px_rgba(69,224,214,0.15)]"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "Play",
+    className: "w-8 h-8 ml-1"
+  }))), /*#__PURE__*/React.createElement("div", {
+    className: "px-3 sm:px-4 pb-3"
+  }, /*#__PURE__*/React.createElement(Scrubber, {
+    tl: tl,
+    t: tUI,
+    onSeek: seek,
+    fillRef: fillRef
+  }), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap items-center justify-between gap-2 mt-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1"
+  }, /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => seek((tl.chapters[Math.max(0, chapterIdx - (tUI - tl.chapters[chapterIdx].start < 1.5 ? 1 : 0))] || tl.chapters[0]).start + 0.01),
+    label: "Previous chapter"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "SkipBack"
+  })), /*#__PURE__*/React.createElement("button", {
+    type: "button",
+    onClick: togglePlay,
+    "aria-label": playing ? 'Pause' : 'Play',
+    className: "w-11 h-11 rounded-full bg-ink text-bg grid place-items-center hover:bg-cyan focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: playing ? 'Pause' : 'Play',
+    className: "w-5 h-5"
+  })), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => {
+      const n = tl.chapters[chapterIdx + 1];
+      seek(n ? n.start + 0.01 : tl.total);
+    },
+    label: "Next chapter"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "SkipForward"
+  })), /*#__PURE__*/React.createElement("span", {
+    className: "font-mono text-sm text-muted ml-2 tabular-nums"
+  }, mmss(tUI), " / ", mmss(tl.total))), /*#__PURE__*/React.createElement("div", {
+    className: "flex flex-wrap items-center gap-1"
+  }, /*#__PURE__*/React.createElement("div", {
+    className: "flex items-center gap-1 rounded-lg border border-line px-1",
+    role: "group",
+    "aria-label": "Playback speed"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "Gauge",
+    className: "w-4 h-4 text-muted ml-1"
+  }), SPEEDS.map(s => /*#__PURE__*/React.createElement("button", {
+    key: s,
+    type: "button",
+    "aria-pressed": speed === s,
+    onClick: () => setSpeed(s),
+    className: 'min-h-[32px] px-1.5 rounded-md font-mono text-xs ' + (speed === s ? 'bg-amber text-bg font-bold' : 'text-muted hover:text-ink')
+  }, s, "\xD7"))), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setCaptions(v => !v),
+    active: captions,
+    label: "Captions"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "Subtitles"
+  })), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => setOverlays(v => !v),
+    active: overlays,
+    label: "Concept labels"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "Layers"
+  })), /*#__PURE__*/React.createElement(Btn, {
+    onClick: () => canSpeak() ? setVoice(v => !v) : setToast('This browser has no speech voice; captions carry the narration.'),
+    active: voice,
+    label: voice ? 'Narration voice on' : 'Narration voice off'
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: voice ? 'Volume2' : 'VolumeX'
+  })), /*#__PURE__*/React.createElement(Btn, {
+    onClick: fullscreen,
+    label: "Full screen"
+  }, /*#__PURE__*/React.createElement(Icon, {
+    name: "Maximize2"
+  })))), /*#__PURE__*/React.createElement("p", {
+    className: "text-[11px] text-muted mt-2 hidden sm:block"
+  }, "Keys: Space play \xB7 \u2190/\u2192 5 s \xB7 J/L 10 s \xB7 1\u20134 chapters \xB7 C captions \xB7 O labels \xB7 </> speed. Click anything moving to pause and inspect it."))), toast && /*#__PURE__*/React.createElement("div", {
+    role: "status",
+    className: "rounded-xl border border-amber/50 bg-amber/10 text-amber text-sm px-4 py-2"
+  }, toast), /*#__PURE__*/React.createElement(LabPanel, {
+    mode: mode,
+    params: params[mode],
+    setParams: setParams,
+    d: d,
+    spec: spec,
+    onReset: () => setParamsAll(all => Object.assign({}, all, {
+      [mode]: Object.assign({}, mode === 'xps' ? XPS_DEFAULT : EELS_DEFAULT)
+    }))
+  })), /*#__PURE__*/React.createElement(ScriptPanel, {
+    tl: tl,
+    t: tUI,
+    onSeek: seek,
+    playing: playing
+  })), modal && /*#__PURE__*/React.createElement(ScriptModal, {
+    mode: mode,
+    chapters: scripts[mode],
+    onClose: () => setModal(false),
+    onReset: () => {
+      setScripts(s => Object.assign({}, s, {
+        [mode]: DEFAULT_SCRIPTS[mode]
+      }));
+      seek(0);
+    },
+    onApply: (chs, note) => {
+      setScripts(s => Object.assign({}, s, {
+        [mode]: chs
+      }));
+      seek(0);
+      setModal(false);
+      setToast('Script applied: ' + chs.reduce((n, c) => n + c.lines.length, 0) + ' sentences across 4 stages.' + (note ? ' ' + note : ''));
+    }
+  }));
+}
+ReactDOM.createRoot(document.getElementById('root')).render(/*#__PURE__*/React.createElement(Player, null));
+window.__mounted = true;
+}
+</script>
+
+</body></html>

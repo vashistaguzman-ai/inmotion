@@ -1,0 +1,1188 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#faf9f5;color:#141413}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>EDS Motion Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&family=IBM+Plex+Sans:ital,wght@0,400;0,500;0,600;1,400&display=swap" rel="stylesheet">
+<style>
+  :root{
+    color-scheme: dark;
+    --ground:#06080c; --panel:#0d1219; --panel2:#121923; --raise:#18212d;
+    --line:#1d2835; --line2:#2a3848;
+    --text:#e4ebf3; --muted:#8395aa; --faint:#56667a;
+    --cyan:#5ce1e6; --bound:#a9c6ff; --mag:#ff5fa2; --amber:#ffb547; --se:#6ee7a8; --auger:#d4f25c; --violet:#b69cff; --red:#ff6b6b;
+    --f-disp:"Chakra Petch", "Segoe UI", system-ui, sans-serif;
+    --f-sans:"IBM Plex Sans", "Segoe UI", system-ui, sans-serif;
+    --f-mono:"IBM Plex Mono", ui-monospace, "Cascadia Mono", Consolas, monospace;
+  }
+  html,body{background:var(--ground);color:var(--text)}
+  body{font-family:var(--f-sans);font-size:14px;line-height:1.5;padding-inline:16px;padding-block:18px 40px}
+  .app{max-width:1440px;margin:0 auto}
+  .mono{font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+  .disp{font-family:var(--f-disp)}
+  button{font:inherit;color:inherit}
+  :focus-visible{outline:2px solid var(--cyan);outline-offset:2px;border-radius:6px}
+
+  /* header */
+  .eyebrow{font-family:var(--f-mono);font-size:11px;letter-spacing:.14em;text-transform:uppercase;color:var(--muted)}
+  h1.title{font-family:var(--f-disp);font-weight:600;font-size:clamp(22px,2.6vw,30px);line-height:1.1;letter-spacing:.01em;text-wrap:balance;margin:2px 0 0}
+  .sig{display:inline-flex;align-items:center;gap:6px;font-size:12px;color:var(--muted)}
+  .sig i{width:9px;height:9px;border-radius:50%;display:inline-block;box-shadow:0 0 8px currentColor}
+
+  /* player */
+  .player{background:var(--panel);border:1px solid var(--line);border-radius:14px;overflow:hidden;position:relative}
+  .player:fullscreen{border-radius:0;display:flex;flex-direction:column;justify-content:center;background:#000}
+  .player:fullscreen .stage{width:min(100vw, calc((100vh - 120px) * 16 / 9));margin:0 auto}
+  .stage{position:relative;aspect-ratio:16/9;width:100%;max-width:100%;background:#05070a;overflow:hidden;user-select:none}
+  .stage canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+  .cap-wrap{position:absolute;left:0;right:0;bottom:4.5%;display:flex;justify-content:center;pointer-events:none;padding:0 5%}
+  .cap{max-width:78ch;background:rgba(4,6,10,.78);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);border:1px solid rgba(120,160,210,.14);border-radius:10px;padding:8px 14px;font-size:clamp(11px,1.45vw,17px);line-height:1.45;font-weight:500;text-align:center;animation:capIn .35s ease-out}
+  .cap .w{color:rgba(228,235,243,.34);transition:color .12s}
+  .cap .w.on{color:var(--text)}
+  .cap .w.em.on{color:var(--cyan)}
+  .cap .w.now{color:#fff;text-shadow:0 0 12px rgba(92,225,230,.55)}
+  @keyframes capIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
+  .title-card{position:absolute;left:4%;top:9%;pointer-events:none;animation:tcIn 2.8s ease-out forwards}
+  .title-card .n{font-family:var(--f-mono);font-size:clamp(9px,1vw,12px);letter-spacing:.2em;color:var(--muted);text-transform:uppercase}
+  .title-card .t{font-family:var(--f-disp);font-weight:600;font-size:clamp(16px,2.8vw,34px);line-height:1.05;text-shadow:0 2px 20px rgba(0,0,0,.8)}
+  .title-card .bar{height:2px;width:64px;margin-top:8px;border-radius:2px}
+  @keyframes tcIn{0%{opacity:0;transform:translateX(-12px)}12%{opacity:1;transform:none}78%{opacity:1}100%{opacity:0}}
+  .poster{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;background:radial-gradient(ellipse at 50% 55%,rgba(6,8,12,.55),rgba(6,8,12,.92));}
+  .poster-inner{text-align:center;padding:16px;max-width:560px}
+  .bigplay{width:clamp(52px,7vw,76px);height:clamp(52px,7vw,76px);border-radius:50%;display:inline-flex;align-items:center;justify-content:center;background:var(--cyan);color:#041014;box-shadow:0 0 0 8px rgba(92,225,230,.12),0 0 40px rgba(92,225,230,.35);transition:transform .15s}
+  .bigplay:hover{transform:scale(1.06)}
+  .tip{position:absolute;pointer-events:none;background:rgba(6,9,14,.94);border:1px solid var(--line2);border-radius:8px;padding:5px 9px;font-size:12px;white-space:nowrap;transform:translate(-50%,calc(-100% - 12px));z-index:5}
+  .tip b{font-weight:600}
+  .paused-badge{position:absolute;top:10px;left:50%;transform:translateX(-50%);font-family:var(--f-mono);font-size:11px;letter-spacing:.12em;color:var(--amber);background:rgba(6,9,14,.8);border:1px solid rgba(255,181,71,.35);border-radius:999px;padding:3px 10px;pointer-events:none}
+
+  /* info card */
+  .info{position:absolute;right:12px;top:12px;width:min(330px,calc(100% - 24px));max-height:calc(100% - 24px);overflow:auto;background:rgba(9,13,19,.96);border:1px solid var(--line2);border-radius:12px;padding:14px 14px 12px;z-index:6;box-shadow:0 20px 50px rgba(0,0,0,.5);animation:capIn .25s ease-out}
+  .info h3{font-family:var(--f-disp);font-weight:600;font-size:18px;line-height:1.15;margin:0}
+  .info .body{color:#c3cfdc;font-size:13px;margin-top:8px}
+  .info .formula{margin-top:10px;font-family:var(--f-mono);font-size:12.5px;background:#070a0f;border:1px solid var(--line);border-radius:8px;padding:8px 10px;color:var(--text);overflow-x:auto;white-space:nowrap}
+  .info dl{display:grid;grid-template-columns:auto 1fr;gap:3px 12px;margin:10px 0 0;font-size:12.5px}
+  .info dt{color:var(--muted)} .info dd{margin:0;text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+
+  /* controls */
+  .controls{padding:10px 14px 12px;border-top:1px solid var(--line);background:linear-gradient(#0e141c,#0b1017)}
+  .ibtn{width:34px;height:34px;display:inline-flex;align-items:center;justify-content:center;border-radius:8px;color:#cfd9e4;transition:background .12s,color .12s;flex:none}
+  .ibtn:hover{background:var(--raise);color:#fff}
+  .ibtn.on{color:var(--cyan)}
+  .ibtn:disabled{opacity:.35;cursor:not-allowed}
+  .ibtn.play{width:40px;height:40px;background:var(--cyan);color:#041014;border-radius:50%}
+  .ibtn.play:hover{background:#86ecef;color:#041014}
+  .tl-wrap{position:relative;padding:9px 0;cursor:pointer;touch-action:none}
+  .tl-track{position:relative;height:6px}
+  .tl-seg{position:absolute;top:0;height:6px;border-radius:3px;background:#1b2531;overflow:hidden}
+  .tl-fill{position:absolute;left:0;top:0;bottom:0}
+  .tl-tick{position:absolute;top:1px;width:1px;height:4px;background:rgba(6,8,12,.7)}
+  .tl-thumb{position:absolute;top:50%;width:14px;height:14px;border-radius:50%;background:#fff;transform:translate(-50%,-50%);box-shadow:0 0 0 3px rgba(92,225,230,.35);pointer-events:none}
+  .tl-tip{position:absolute;bottom:26px;transform:translateX(-50%);background:rgba(6,9,14,.96);border:1px solid var(--line2);border-radius:8px;padding:5px 9px;font-size:12px;white-space:nowrap;pointer-events:none;z-index:4}
+  .chip{display:inline-flex;align-items:center;gap:6px;border:1px solid var(--line);background:var(--panel2);border-radius:8px;padding:4px 9px;font-size:12px;color:#c9d4e0;transition:border-color .12s,background .12s;white-space:nowrap}
+  .chip:hover{border-color:var(--line2);background:var(--raise)}
+  .chip.on{border-color:currentColor}
+  .chapter-row{display:flex;gap:6px;overflow-x:auto;padding-bottom:2px;scrollbar-width:thin}
+  .menu{position:absolute;bottom:44px;right:0;background:#0b1017;border:1px solid var(--line2);border-radius:10px;padding:5px;z-index:10;min-width:110px;box-shadow:0 12px 30px rgba(0,0,0,.5)}
+  .menu button{display:flex;justify-content:space-between;width:100%;padding:5px 10px;border-radius:6px;font-family:var(--f-mono);font-size:12.5px}
+  .menu button:hover{background:var(--raise)}
+  .menu button.on{color:var(--cyan)}
+  .wave{display:flex;align-items:center;gap:2px;height:22px}
+  .wave i{display:block;width:3px;border-radius:2px;background:var(--cyan);opacity:.75;transition:height .08s}
+
+  /* panels */
+  .card{background:var(--panel);border:1px solid var(--line);border-radius:14px}
+  .card-h{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:12px 14px;border-bottom:1px solid var(--line)}
+  .card-h h2{font-family:var(--f-disp);font-weight:600;font-size:15px;letter-spacing:.02em;margin:0;display:flex;align-items:center;gap:8px}
+  .script{position:relative;overflow-y:auto;scrollbar-width:thin}
+  .ch-head{position:sticky;top:0;z-index:1;background:linear-gradient(var(--panel) 80%,rgba(13,18,25,0));padding:12px 14px 6px;display:flex;align-items:baseline;gap:8px}
+  .ch-head .num{font-family:var(--f-mono);font-size:11px;color:var(--muted)}
+  .ch-head .nm{font-family:var(--f-disp);font-weight:600;font-size:14px}
+  .ch-head .tm{margin-left:auto;font-family:var(--f-mono);font-size:11px;color:var(--faint)}
+  .sent{display:grid;grid-template-columns:44px 1fr;gap:8px;width:100%;text-align:left;padding:7px 14px;border-left:2px solid transparent;color:#aebccb;font-size:13.5px;line-height:1.5;position:relative;transition:background .12s,color .12s}
+  .sent:hover{background:rgba(255,255,255,.025);color:var(--text)}
+  .sent .ts{font-family:var(--f-mono);font-size:11px;color:var(--faint);padding-top:2px}
+  .sent.active{background:rgba(92,225,230,.06);color:var(--text)}
+  .sent.past{color:#7f90a3}
+  .sent .prog{position:absolute;left:0;bottom:0;height:2px;background:currentColor;opacity:.5}
+  .sent em{font-style:normal;color:var(--cyan)}
+  .sent.past em{color:#7fb9bd}
+
+  .lab-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:16px;padding:14px}
+  .ctl label, .ctl .lbl{display:flex;justify-content:space-between;align-items:baseline;font-size:12.5px;color:var(--muted);margin-bottom:6px}
+  .ctl .val{font-family:var(--f-mono);color:var(--text);font-size:13px}
+  input[type=range]{-webkit-appearance:none;appearance:none;width:100%;height:4px;border-radius:2px;background:linear-gradient(90deg,var(--acc,var(--cyan)) var(--p,50%),#243142 var(--p,50%));outline:none}
+  input[type=range]::-webkit-slider-thumb{-webkit-appearance:none;width:16px;height:16px;border-radius:50%;background:#fff;border:3px solid var(--acc,var(--cyan));cursor:pointer}
+  input[type=range]::-moz-range-thumb{width:12px;height:12px;border-radius:50%;background:#fff;border:3px solid var(--acc,var(--cyan));cursor:pointer}
+  input[type=range]:focus-visible{outline:2px solid var(--cyan);outline-offset:4px}
+  .ticks{display:flex;justify-content:space-between;font-family:var(--f-mono);font-size:10.5px;color:var(--faint);margin-top:4px}
+  .elbtn{display:flex;flex-direction:column;align-items:center;justify-content:center;width:100%;aspect-ratio:1;border:1px solid var(--line);background:var(--panel2);border-radius:8px;transition:border-color .12s,background .12s;padding:2px}
+  .elbtn:hover{border-color:var(--line2);background:var(--raise)}
+  .elbtn .z{font-family:var(--f-mono);font-size:9.5px;color:var(--faint);line-height:1}
+  .elbtn .s{font-family:var(--f-disp);font-weight:600;font-size:17px;line-height:1.1}
+  .elbtn.on{border-color:var(--cyan);background:rgba(92,225,230,.08)}
+  .elbtn.on .s{color:var(--cyan)}
+  select{width:100%;background:var(--panel2);border:1px solid var(--line);border-radius:8px;padding:6px 8px;color:var(--text);font:inherit;font-size:13px}
+  .readout{display:grid;grid-template-columns:1fr auto;gap:4px 10px;font-size:12.5px}
+  .readout dt{color:var(--muted)} .readout dd{margin:0;text-align:right;font-family:var(--f-mono);font-variant-numeric:tabular-nums}
+  .edge{display:flex;align-items:center;gap:8px;font-size:12px;padding:4px 0;border-bottom:1px dashed var(--line)}
+  .edge:last-child{border-bottom:0}
+  .dot{width:7px;height:7px;border-radius:50%;flex:none}
+  .kbd{font-family:var(--f-mono);font-size:10.5px;border:1px solid var(--line2);border-bottom-width:2px;border-radius:4px;padding:0 4px;color:#b8c5d3}
+  .toggle{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;color:#c9d4e0;cursor:pointer}
+  .toggle input{accent-color:var(--cyan);width:15px;height:15px}
+  @media (max-width: 700px){
+    .info{position:static;width:auto;max-height:none;margin:8px;box-shadow:none}
+    .cap{padding:5px 9px}
+    .hide-sm{display:none!important}
+  }
+  @media (prefers-reduced-motion: reduce){
+    .cap,.info,.title-card{animation:none}
+    .title-card{opacity:1}
+  }
+</style>
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  try{ tailwind.config={theme:{extend:{fontFamily:{disp:['"Chakra Petch"','system-ui','sans-serif'],sans:['"IBM Plex Sans"','system-ui','sans-serif'],mono:['"IBM Plex Mono"','ui-monospace','monospace']}}}}; }catch(e){}
+</script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.3.1/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.3.1/umd/react-dom.production.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/lucide@0.460.0/dist/umd/lucide.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@babel/standalone@7.24.7/babel.min.js"></script>
+
+<div class="app" id="root">
+  <p class="eyebrow">MET_ENG 5520 · Electron Microscopy</p>
+  <h1 class="title">EDS Motion Lab</h1>
+  <p style="color:var(--muted)">Loading the interactive player…</p>
+</div>
+
+<script type="text/babel" data-presets="react">
+const { useState, useEffect, useRef, useMemo, useCallback } = React;
+
+/* =====================================================================
+   0 · UTILITIES
+   ===================================================================== */
+const clamp = (x, a = 0, b = 1) => Math.min(b, Math.max(a, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const ease = t => (t < 0.5 ? 2 * t * t : 1 - Math.pow(-2 * t + 2, 2) / 2);
+const easeOut = t => 1 - Math.pow(1 - t, 3);
+const hash = n => { const x = Math.sin(n * 127.1 + 311.7) * 43758.5453; return x - Math.floor(x); };
+const gauss = n => { const u = Math.max(1e-6, hash(n)), v = hash(n + 71.3); return Math.sqrt(-2 * Math.log(u)) * Math.cos(2 * Math.PI * v); };
+const fmtTime = s => { s = Math.max(0, s); const m = Math.floor(s / 60), r = Math.floor(s % 60); return `${m}:${String(r).padStart(2, '0')}`; };
+const fmtE = E => (E < 1 ? `${Math.round(E * 1000)} eV` : `${E.toFixed(E < 10 ? 3 : 2)} keV`);
+const fmtLen = um => (um < 1 ? `${Math.round(um * 1000)} nm` : `${um.toFixed(um < 10 ? 2 : 1)} µm`);
+const niceCeil = x => { const p = Math.pow(10, Math.floor(Math.log10(x))); for (const m of [1, 2, 5, 10]) if (x <= m * p) return m * p; return 10 * p; };
+function hexA(hex, a) { const n = parseInt(hex.slice(1), 16); return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a})`; }
+function hsl2hex(h, s, l) { s /= 100; l /= 100; const k = n => (n + h / 30) % 12, a = s * Math.min(l, 1 - l); const f = n => l - a * Math.max(-1, Math.min(k(n) - 3, Math.min(9 - k(n), 1))); const to = x => Math.round(x * 255).toString(16).padStart(2, '0'); return `#${to(f(0))}${to(f(8))}${to(f(4))}`; }
+const photonColor = E => { const t = clamp(Math.log10(E / 0.2) / Math.log10(150)); return hsl2hex((35 - 110 * t + 360) % 360, 95, 66); };
+const store = {
+  get(k, d) { try { const v = localStorage.getItem('edslab:' + k); return v == null ? d : JSON.parse(v); } catch (e) { return d; } },
+  set(k, v) { try { localStorage.setItem('edslab:' + k, JSON.stringify(v)); } catch (e) {} },
+};
+const C = { cyan: '#5ce1e6', bound: '#a9c6ff', amber: '#ffb547', se: '#6ee7a8', auger: '#d4f25c', mag: '#ff5fa2', violet: '#b69cff', red: '#ff6b6b', text: '#e4ebf3', muted: '#8395aa', faint: '#56667a' };
+const SHELL = ['K', 'L', 'M', 'N'];
+
+/* =====================================================================
+   1 · ELEMENT DATA  (edges & line energies in keV; levels = binding energies)
+   ===================================================================== */
+const ELEMENTS = {
+  C:  { sym: 'C',  name: 'Carbon',    Z: 6,  A: 12.011, rho: 2.26,  levels: [['K', 0.284], ['L', 0.011]], counts: [2, 4],
+        lines: [{ n: 'Kα', E: 0.277, sh: 0, from: 1, rel: 1 }] },
+  Al: { sym: 'Al', name: 'Aluminium', Z: 13, A: 26.982, rho: 2.70,  levels: [['K', 1.560], ['L', 0.073], ['M', 0.006]], counts: [2, 8, 3],
+        lines: [{ n: 'Kα', E: 1.487, sh: 0, from: 1, rel: 1 }, { n: 'Kβ', E: 1.557, sh: 0, from: 2, rel: 0.04 }] },
+  Si: { sym: 'Si', name: 'Silicon',   Z: 14, A: 28.086, rho: 2.33,  levels: [['K', 1.839], ['L', 0.100], ['M', 0.008]], counts: [2, 8, 4],
+        lines: [{ n: 'Kα', E: 1.740, sh: 0, from: 1, rel: 1 }, { n: 'Kβ', E: 1.836, sh: 0, from: 2, rel: 0.05 }] },
+  Ti: { sym: 'Ti', name: 'Titanium',  Z: 22, A: 47.867, rho: 4.51,  levels: [['K', 4.966], ['L', 0.454], ['M', 0.033], ['N', 0.007]], counts: [2, 8, 10, 2],
+        lines: [{ n: 'Kα', E: 4.511, sh: 0, from: 1, rel: 1 }, { n: 'Kβ', E: 4.932, sh: 0, from: 2, rel: 0.13 }, { n: 'Lα', E: 0.452, sh: 1, from: 2, rel: 1 }] },
+  Fe: { sym: 'Fe', name: 'Iron',      Z: 26, A: 55.845, rho: 7.87,  levels: [['K', 7.112], ['L', 0.707], ['M', 0.053], ['N', 0.007]], counts: [2, 8, 12, 2],
+        lines: [{ n: 'Kα', E: 6.404, sh: 0, from: 1, rel: 1 }, { n: 'Kβ', E: 7.058, sh: 0, from: 2, rel: 0.13 }, { n: 'Lα', E: 0.705, sh: 1, from: 2, rel: 1 }] },
+  Cu: { sym: 'Cu', name: 'Copper',    Z: 29, A: 63.546, rho: 8.96,  levels: [['K', 8.979], ['L', 0.933], ['M', 0.075], ['N', 0.008]], counts: [2, 8, 12, 1],
+        lines: [{ n: 'Kα', E: 8.048, sh: 0, from: 1, rel: 1 }, { n: 'Kβ', E: 8.905, sh: 0, from: 2, rel: 0.13 }, { n: 'Lα', E: 0.930, sh: 1, from: 2, rel: 1 }] },
+  Ag: { sym: 'Ag', name: 'Silver',    Z: 47, A: 107.87, rho: 10.49, levels: [['K', 25.514], ['L', 3.351], ['M', 0.368], ['N', 0.058]], counts: [2, 8, 12, 12],
+        lines: [{ n: 'Kα', E: 22.163, sh: 0, from: 1, rel: 1 }, { n: 'Kβ', E: 24.942, sh: 0, from: 2, rel: 0.18 }, { n: 'Lα', E: 2.984, sh: 1, from: 2, rel: 1 }, { n: 'Lβ', E: 3.151, sh: 1, from: 2, rel: 0.45 }] },
+  Au: { sym: 'Au', name: 'Gold',      Z: 79, A: 196.97, rho: 19.32, levels: [['K', 80.725], ['L', 11.919], ['M', 2.206], ['N', 0.084]], counts: [2, 8, 12, 12],
+        lines: [{ n: 'Kα', E: 68.80, sh: 0, from: 1, rel: 1 }, { n: 'Kβ', E: 77.98, sh: 0, from: 2, rel: 0.2 }, { n: 'Lα', E: 9.713, sh: 1, from: 2, rel: 1 }, { n: 'Lβ', E: 11.442, sh: 1, from: 2, rel: 0.55 }, { n: 'Mα', E: 2.123, sh: 2, from: 3, rel: 1 }] },
+};
+const EL_ORDER = ['C', 'Al', 'Si', 'Ti', 'Fe', 'Cu', 'Ag', 'Au'];
+
+/* =====================================================================
+   2 · PHYSICS
+   ===================================================================== */
+const omega = (Z, sh) => { const a = [1.12e6, 1.0e8, 1.2e9][sh] || 1.2e9; const z4 = Math.pow(Z, 4); return z4 / (z4 + a); };
+function ionShell(el, E0) { for (let s = 0; s < el.levels.length; s++) { if (el.lines.some(l => l.sh === s) && E0 > el.levels[s][1]) return s; } return -1; }
+const effDet = E => Math.exp(-Math.pow(0.32 / E, 3)) * (1 - Math.exp(-Math.pow(18 / E, 2)));
+const fwhmAt = (res, E) => Math.sqrt(Math.max(res * res + 2.49 * (E * 1000 - 5895), 36 * 36)) / 1000;
+
+function physics(p) {
+  const E0 = p.E0, V = E0 * 1000, gamma = 1 + E0 / 511, beta = Math.sqrt(1 - 1 / (gamma * gamma));
+  const lambda = 1226.4 / Math.sqrt(V * (1 + 0.9785e-6 * V)); // pm
+  const el = ELEMENTS[p.el];
+  const el2 = p.el2 !== 'none' && p.el2 !== p.el ? ELEMENTS[p.el2] : null;
+  const x2 = el2 ? p.x2 / 100 : 0;
+  const comp = [{ el, x: 1 - x2 }]; if (el2) comp.push({ el: el2, x: x2 });
+  const mA = comp.reduce((s, c) => s + c.x * c.el.A, 0); comp.forEach(c => (c.w = (c.x * c.el.A) / mA));
+  const Zbar = comp.reduce((s, c) => s + c.w * c.el.Z, 0), Abar = comp.reduce((s, c) => s + c.w * c.el.A, 0);
+  const rho = 1 / comp.reduce((s, c) => s + c.w / c.el.rho, 0);
+  const R = (0.0276 * Abar * Math.pow(E0, 1.67)) / (Math.pow(Zbar, 0.89) * rho); // Kanaya–Okayama, µm
+  const eta = clamp(-0.0254 + 0.016 * Zbar - 1.86e-4 * Zbar * Zbar + 8.3e-7 * Math.pow(Zbar, 3), 0, 0.6);
+  const s0 = ionShell(el, E0);
+  const Ec = s0 >= 0 ? el.levels[s0][1] : el.levels[el.levels.length - 1][1];
+  const Rx = Math.min(R, Math.max(0.002, (0.064 * (Math.pow(E0, 1.68) - Math.pow(Ec, 1.68))) / rho));
+  const label = el2 ? `${el.sym}–${Math.round(p.x2)} at% ${el2.sym}` : `Pure ${el.name.toLowerCase()}`;
+  return { E0, beta, gamma, lambda, el, el2, comp, Zbar, Abar, rho, R, eta, s0, Ec, Rx, label };
+}
+
+function buildSpectrum(ph, res, current) {
+  const E0 = ph.E0, n = 360, dE = E0 / n, mu = new Float64Array(n);
+  const Zm = ph.comp.reduce((s, c) => s + c.w * c.el.Z, 0);
+  for (let i = 0; i < n; i++) { const E = (i + 0.5) * dE; mu[i] = (Zm * (E0 - E)) / E * effDet(E) * dE; }
+  const lines = [];
+  ph.comp.forEach(c => c.el.lines.forEach(l => {
+    const edge = c.el.levels[l.sh][1]; if (E0 <= edge || l.E >= E0) return;
+    const U = E0 / edge, x = Math.pow(U - 1, 1.67), g = x / (1 + x / 25);
+    const area = 480 * c.w * omega(c.el.Z, l.sh) * g * l.rel * effDet(l.E);
+    const fw = fwhmAt(res, l.E), sg = fw / 2.3548, norm = 1 / (sg * Math.sqrt(2 * Math.PI));
+    const i0 = Math.max(0, Math.floor((l.E - 4 * sg) / dE)), i1 = Math.min(n - 1, Math.ceil((l.E + 4 * sg) / dE));
+    for (let i = i0; i <= i1; i++) { const E = (i + 0.5) * dE; mu[i] += area * Math.exp(-0.5 * Math.pow((E - l.E) / sg, 2)) * norm * dE; }
+    lines.push({ el: c.el, sym: c.el.sym, n: l.n, E: l.E, edge, U, area, fw, sh: l.sh, rel: l.rel, from: l.from, peak: area * norm * dE });
+  }));
+  let mx = 0; for (let i = 0; i < n; i++) mx = Math.max(mx, mu[i]);
+  const s = (3200 * current) / mx; for (let i = 0; i < n; i++) mu[i] *= s;
+  lines.forEach(l => { l.peak *= s; l.area *= s; l.top = mu[clamp(Math.floor(l.E / dE), 0, n - 1)]; });
+  const cdf = new Float64Array(n); let acc = 0; for (let i = 0; i < n; i++) { acc += mu[i]; cdf[i] = acc; } for (let i = 0; i < n; i++) cdf[i] /= acc;
+  const noise = new Float64Array(n); for (let i = 0; i < n; i++) noise[i] = gauss(i * 12.9898 + E0 * 3.1 + res * 0.07);
+  lines.sort((a, b) => b.peak - a.peak);
+  return { n, dE, E0, mu, cdf, lines, max: 3200 * current, total: acc, noise };
+}
+function sampleE(spec, u) { let lo = 0, hi = spec.n - 1; while (lo < hi) { const m = (lo + hi) >> 1; if (spec.cdf[m] < u) lo = m + 1; else hi = m; } return (lo + 0.5) * spec.dE; }
+function lineNear(spec, E) { let best = null, bd = 1e9; spec.lines.forEach(l => { const d = Math.abs(l.E - E); if (d < l.fw * 0.9 && d < bd) { bd = d; best = l; } }); return best; }
+
+/* =====================================================================
+   3 · NARRATION SCRIPT (adapted from the MET_ENG 5520 lecture transcripts)
+   ===================================================================== */
+const CHAPTERS = [
+  { title: 'Primary Beam & Interaction Volume', short: 'Primary beam', color: C.cyan, sents: [
+    { d: 6,   text: 'Every X-ray spectrum in the electron microscope starts with one event: a *high-energy primary electron* striking the specimen.' },
+    { d: 6.5, text: 'In the *SEM* we collect signals that leave the top of the specimen; in the *TEM* we collect what is transmitted through a thin foil.' },
+    { d: 7,   text: 'Inside, electrons scatter *elastically* off nuclei and *inelastically* off atomic electrons, tracing out the *interaction volume*.' },
+    { d: 6.5, text: 'It grows with accelerating voltage and shrinks with atomic number. Change the lab settings and watch the depth readout.' },
+    { d: 8,   text: '*Secondary electrons* escape from the top few nanometers, *backscattered electrons* from deeper, and *characteristic X-rays* from deeper still.' } ] },
+  { title: 'Inner-Shell Ionization', short: 'Ionization', color: C.bound, sents: [
+    { d: 7,   text: 'Now zoom into a single atom: a positive *nucleus* wrapped in electron shells named *K, L and M*, from the innermost outward.' },
+    { d: 5.5, text: 'Each shell has its own *binding energy*, and the K shell is held most tightly.' },
+    { d: 6,   text: 'If the primary electron carries more energy than that binding energy, it can *eject an inner-shell electron*.' },
+    { d: 5,   text: 'The atom is now ionized, with a vacancy, a *core hole*, deep inside.' },
+    { d: 7,   text: 'The primary moves on, having lost at least the binding energy. Measuring that loss in the TEM is *EELS*.' } ] },
+  { title: 'Characteristic X-rays', short: 'X-ray emission', color: C.mag, sents: [
+    { d: 6,   text: 'A core hole is unstable. The atom lowers its energy by letting an *outer electron drop in* to fill it.' },
+    { d: 6.5, text: 'When an L electron fills a K hole, the energy difference leaves as an X-ray photon: *K-alpha*.' },
+    { d: 7,   text: 'When an M electron fills it instead, we get *K-beta*, with higher energy because the M-to-K gap is larger.' },
+    { d: 6,   text: 'K-alpha is far more intense: the L shell is right next door, so that jump is *much more probable*.' },
+    { d: 6,   text: 'Shell energies are unique to each element, so these photon energies are an *elemental fingerprint*.' } ] },
+  { title: 'The Auger Alternative', short: 'Auger', color: C.auger, sents: [
+    { d: 6.5, text: 'The X-ray is not the only exit. The same excess energy can be *handed internally* to another outer electron.' },
+    { d: 5,   text: 'That electron is ejected with its own characteristic energy: an *Auger electron*.' },
+    { d: 6.5, text: '*Light elements* favor Auger emission and give few X-rays; *heavy elements* favor X-rays.' },
+    { d: 6.5, text: 'Auger electrons escape only from the top few nanometers, so Auger spectroscopy is *extremely surface sensitive*.' } ] },
+  { title: 'Bremsstrahlung Background', short: 'Continuum', color: C.amber, sents: [
+    { d: 6.5, text: 'Many primary electrons never ionize anything. They are *bent by the Coulomb pull* of a positive nucleus.' },
+    { d: 5,   text: 'Decelerating, the electron radiates *braking radiation*: Bremsstrahlung.' },
+    { d: 6.5, text: 'These X-rays take *any energy up to the beam energy*, forming the continuous background under every EDS spectrum.' },
+    { d: 6,   text: 'Where that continuum falls to zero, the *Duane–Hunt limit*, equals the true accelerating voltage.' } ] },
+  { title: 'Detection & the EDS Spectrum', short: 'Detection', color: C.violet, sents: [
+    { d: 5.5, text: 'Now we collect them. X-rays fly from the specimen into an *energy-dispersive detector*.' },
+    { d: 5.5, text: 'Each photon is measured one at a time, and its energy *sorts it into a channel*.' },
+    { d: 5.5, text: 'Count by count, *characteristic peaks* rise above the smooth Bremsstrahlung background.' },
+    { d: 6.5, text: 'Peak *positions* identify the elements; peak *areas*, after correction, give composition in atomic or weight percent.' },
+    { d: 7,   text: '*Energy resolution* decides whether neighboring peaks separate. Widen it in the lab panel and watch them merge.' },
+    { d: 7,   text: 'Push the beam energy past an *absorption edge* and a new family of lines switches on. That is *overvoltage* at work.' } ] },
+];
+const SENTS = []; let _acc = 0;
+CHAPTERS.forEach((c, ci) => { c.start = _acc; c.sents.forEach((s, si) => { s.start = _acc; s.ci = ci; s.si = si; s.gi = SENTS.length; SENTS.push(s); _acc += s.d; }); c.dur = _acc - c.start; });
+const TOTAL = _acc;
+function locate(t) {
+  const tt = clamp(t, 0, TOTAL - 1e-6);
+  let ci = CHAPTERS.findIndex(c => tt < c.start + c.dur); if (ci < 0) ci = CHAPTERS.length - 1;
+  let gi = SENTS.findIndex(s => tt < s.start + s.d); if (gi < 0) gi = SENTS.length - 1;
+  const s = SENTS[gi];
+  return { ci, lt: tt - CHAPTERS[ci].start, gi, sp: clamp((tt - s.start) / s.d) };
+}
+const plain = s => s.replace(/\*/g, '');
+
+/* =====================================================================
+   4 · CANVAS PRIMITIVES
+   ===================================================================== */
+const FONT = { sans: '"IBM Plex Sans", "Segoe UI", system-ui, sans-serif', mono: '"IBM Plex Mono", ui-monospace, Consolas, monospace', disp: '"Chakra Petch", "Segoe UI", system-ui, sans-serif' };
+const F = (s, w = 500, f = 'sans') => `${w} ${s}px ${FONT[f]}`;
+function rr(ctx, x, y, w, h, r) { ctx.beginPath(); ctx.moveTo(x + r, y); ctx.arcTo(x + w, y, x + w, y + h, r); ctx.arcTo(x + w, y + h, x, y + h, r); ctx.arcTo(x, y + h, x, y, r); ctx.arcTo(x, y, x + w, y, r); ctx.closePath(); }
+function txt(ctx, s, x, y, o = {}) { ctx.save(); ctx.globalAlpha *= o.a ?? 1; ctx.font = F(o.size || 13, o.w || 500, o.f || 'sans'); ctx.fillStyle = o.color || C.text; ctx.textAlign = o.align || 'left'; ctx.textBaseline = o.base || 'alphabetic'; ctx.fillText(s, x, y); ctx.restore(); }
+function pill(ctx, s, x, y, o = {}) {
+  ctx.save(); ctx.globalAlpha *= o.a ?? 1; const size = o.size || 12; ctx.font = F(size, o.w || 600, o.f || 'mono');
+  const w = ctx.measureText(s).width + 16, h = size + 10; const x0 = o.align === 'center' ? x - w / 2 : o.align === 'right' ? x - w : x; const y0 = y - h / 2;
+  rr(ctx, x0, y0, w, h, h / 2); ctx.fillStyle = o.bg || 'rgba(6,9,14,0.88)'; ctx.fill(); ctx.strokeStyle = hexA(o.color || C.cyan, 0.55); ctx.lineWidth = 1; ctx.stroke();
+  ctx.fillStyle = o.color || C.cyan; ctx.textBaseline = 'middle'; ctx.textAlign = 'left'; ctx.fillText(s, x0 + 8, y + 0.5); ctx.restore(); return { x: x0, y: y0, w, h };
+}
+function panel(ctx, x, y, w, h, a = 1) { ctx.save(); ctx.globalAlpha *= a; rr(ctx, x, y, w, h, 10); ctx.fillStyle = 'rgba(10,14,20,0.9)'; ctx.fill(); ctx.strokeStyle = 'rgba(120,160,210,0.16)'; ctx.lineWidth = 1; ctx.stroke(); ctx.restore(); }
+function glow(ctx, x, y, r, color, a = 1) {
+  if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  const g = ctx.createRadialGradient(x, y, 0, x, y, r * 3.2); g.addColorStop(0, hexA(color, 0.95)); g.addColorStop(0.3, hexA(color, 0.45)); g.addColorStop(1, hexA(color, 0));
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(x, y, r * 3.2, 0, 7); ctx.fill();
+  ctx.fillStyle = '#ffffff'; ctx.globalAlpha *= 0.9; ctx.beginPath(); ctx.arc(x, y, r * 0.55, 0, 7); ctx.fill(); ctx.restore();
+}
+function arrow(ctx, x1, y1, x2, y2, color, o = {}) {
+  const w = o.w || 2, hd = o.head || 8; const ang = Math.atan2(y2 - y1, x2 - x1);
+  ctx.save(); ctx.globalAlpha *= o.a ?? 1; ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = w; if (o.dash) ctx.setLineDash(o.dash);
+  ctx.beginPath(); ctx.moveTo(x1, y1); ctx.lineTo(x2 - Math.cos(ang) * hd * 0.6, y2 - Math.sin(ang) * hd * 0.6); ctx.stroke(); ctx.setLineDash([]);
+  ctx.beginPath(); ctx.moveTo(x2, y2); ctx.lineTo(x2 - hd * Math.cos(ang - 0.45), y2 - hd * Math.sin(ang - 0.45)); ctx.lineTo(x2 - hd * Math.cos(ang + 0.45), y2 - hd * Math.sin(ang + 0.45)); ctx.closePath(); ctx.fill(); ctx.restore();
+}
+function photon(ctx, x0, y0, ang, dist, E, a = 1) {
+  const col = photonColor(E), t01 = clamp(Math.log10(E / 0.2) / Math.log10(150)), lam = lerp(24, 7, t01), len = 70;
+  const ca = Math.cos(ang), sa = Math.sin(ang);
+  ctx.save(); ctx.globalAlpha *= a; ctx.strokeStyle = col; ctx.lineWidth = 2; ctx.shadowColor = col; ctx.shadowBlur = 8; ctx.beginPath(); let first = true;
+  for (let s = 0; s <= len; s += 1.5) { const d = dist - len + s; if (d < 0) continue; const env = Math.sin((Math.PI * s) / len); const off = Math.sin((d / lam) * 2 * Math.PI) * 7 * env; const x = x0 + ca * d - sa * off, y = y0 + sa * d + ca * off; if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y); }
+  ctx.stroke(); ctx.restore(); return [x0 + ca * dist, y0 + sa * dist];
+}
+function trail(ctx, pts, color, w = 2, a = 1) { if (pts.length < 2) return; ctx.save(); ctx.lineCap = 'round'; for (let i = 1; i < pts.length; i++) { ctx.globalAlpha = a * (i / pts.length) * 0.8; ctx.strokeStyle = color; ctx.lineWidth = w; ctx.beginPath(); ctx.moveTo(pts[i - 1][0], pts[i - 1][1]); ctx.lineTo(pts[i][0], pts[i][1]); ctx.stroke(); } ctx.restore(); }
+function warn(ctx, s, a = 1) { pill(ctx, s, 480, 30, { color: C.amber, align: 'center', size: 12, a, f: 'sans', w: 600 }); }
+const onScreen = (x, y, m = 40) => x > -m && x < 960 + m && y > -m && y < 540 + m;
+
+/* =====================================================================
+   5 · SHARED DIAGRAMS: atom, energy ladder, charts
+   ===================================================================== */
+const RADII = { 2: [72, 132], 3: [62, 110, 156], 4: [50, 90, 128, 164] };
+function atomPos(el, cx, cy, sc, i, k, T) {
+  const r = RADII[el.levels.length][i] * sc, cnt = el.counts[i], w = [0.8, 0.5, 0.34, 0.25][i];
+  const a = i * 0.9 + (k * 2 * Math.PI) / cnt + T * w * (i % 2 ? -1 : 1);
+  return [cx + Math.cos(a) * r, cy + Math.sin(a) * r];
+}
+function drawAtom(ctx, el, cx, cy, sc, T, o = {}) {
+  const a = o.a ?? 1; if (a <= 0) return; ctx.save(); ctx.globalAlpha *= a;
+  const n = el.levels.length;
+  for (let i = 0; i < n; i++) {
+    const r = RADII[n][i] * sc, hi = o.hi === i;
+    ctx.strokeStyle = hi ? 'rgba(169,198,255,0.75)' : 'rgba(120,165,220,0.22)'; ctx.lineWidth = hi ? 2 : 1.2;
+    ctx.setLineDash(hi ? [] : [3, 5]); ctx.beginPath(); ctx.arc(cx, cy, r, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    if (o.labels) { const la = -Math.PI * 0.78; txt(ctx, SHELL[i], cx + Math.cos(la) * r - 4, cy + Math.sin(la) * r - 4, { size: 13, w: 600, f: 'disp', color: hi ? C.bound : C.muted, align: 'right' }); }
+    if (o.showE) { const lx = cx + r * 0.98 + 4, ly = cy + 6 + i * 0; if (hi) pill(ctx, `${SHELL[i]}: ${fmtE(el.levels[i][1])}`, cx + 8, cy - r - 2, { color: C.bound, size: 11 }); }
+  }
+  // nucleus
+  const g = ctx.createRadialGradient(cx, cy, 0, cx, cy, 30 * sc); g.addColorStop(0, '#ffd7a0'); g.addColorStop(0.45, '#ff8a4d'); g.addColorStop(1, 'rgba(255,90,60,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(cx, cy, 30 * sc, 0, 7); ctx.fill();
+  txt(ctx, `${el.Z}+`, cx, cy + 4, { size: 12 * Math.max(sc, 0.7), w: 600, f: 'mono', color: '#2a0d00', align: 'center' });
+  if (o.hs) o.hs.push({ x: cx, y: cy, r: 18 * sc, kind: 'nucleus', data: { el }, tag: o.tagNucleus ? 'Nucleus' : null });
+  // electrons
+  for (let i = 0; i < n; i++) for (let k = 0; k < el.counts[i]; k++) {
+    if (o.missing && o.missing.has(`${i}:${k}`)) continue;
+    const [x, y] = atomPos(el, cx, cy, sc, i, k, T);
+    glow(ctx, x, y, 3.2, C.bound, 0.95);
+    if (o.hs && (k === 0 || k === 1)) o.hs.push({ x, y, r: 9, kind: 'bound', data: { el, i } });
+  }
+  if (o.target) { const [x, y] = atomPos(el, cx, cy, sc, o.target[0], o.target[1], T); ctx.strokeStyle = hexA(C.cyan, 0.8); ctx.lineWidth = 1.5; ctx.setLineDash([2, 3]); ctx.beginPath(); ctx.arc(x, y, 11 + Math.sin(T * 6) * 1.5, 0, 7); ctx.stroke(); ctx.setLineDash([]); if (o.hs) o.hs.push({ x, y, r: 12, kind: 'bound', data: { el, i: o.target[0] }, tag: `${SHELL[o.target[0]]} electron` }); }
+  (o.holes || []).forEach(([i, k, ha]) => {
+    const [x, y] = atomPos(el, cx, cy, sc, i, k, T); const pulse = 0.5 + 0.5 * Math.sin(T * 7);
+    ctx.save(); ctx.globalAlpha *= ha; ctx.strokeStyle = C.red; ctx.lineWidth = 2; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(x, y, 6 + pulse * 2, 0, 7); ctx.stroke(); ctx.setLineDash([]);
+    ctx.fillStyle = hexA(C.red, 0.12 + 0.1 * pulse); ctx.beginPath(); ctx.arc(x, y, 14, 0, 7); ctx.fill(); ctx.restore();
+    if (o.hs && ha > 0.5) o.hs.push({ x, y, r: 12, kind: 'hole', data: { el, i }, tag: o.tagHole ? `${SHELL[i]}-shell hole` : null });
+  });
+  ctx.restore();
+}
+
+function drawLevels(ctx, el, box, st, hs, E0) {
+  const a = st.a ?? 1; if (a <= 0) return null; ctx.save(); ctx.globalAlpha *= a;
+  panel(ctx, box.x, box.y, box.w, box.h);
+  txt(ctx, 'BINDING ENERGY · LOG SCALE', box.x + 14, box.y + 20, { size: 10.5, w: 600, f: 'mono', color: C.muted });
+  const Es = el.levels.map(l => l[1]); const lo = Math.log10(Math.min(...Es) * 0.55), hi = Math.log10(Math.max(Math.max(...Es), E0 || 0) * 1.35);
+  const top = box.y + 58, bot = box.y + box.h - 22; const yOf = E => top + ((Math.log10(E) - lo) / (hi - lo)) * (bot - top);
+  const x1 = box.x + 48, x2 = box.x + box.w - 98;
+  ctx.strokeStyle = 'rgba(200,215,230,0.25)'; ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x1, top - 18); ctx.lineTo(x2 + 60, top - 18); ctx.stroke(); ctx.setLineDash([]);
+  txt(ctx, 'vacuum (free electron)', x1, top - 24, { size: 10.5, color: C.muted, f: 'mono' });
+  if (E0) { // primary energy gauge
+    const ye = Math.min(bot + 6, yOf(E0)), xg = box.x + 24;
+    ctx.fillStyle = hexA(C.cyan, 0.16); ctx.fillRect(xg - 5, top - 18, 10, ye - top + 18);
+    arrow(ctx, xg, top - 18, xg, ye, C.cyan, { w: 2, head: 7 });
+    txt(ctx, 'E₀', xg, ye + 14, { size: 11, w: 600, f: 'mono', color: C.cyan, align: 'center' });
+  }
+  const ys = {};
+  el.levels.forEach(([nm, E], i) => {
+    const y = yOf(E); ys[i] = y; const hl = st.hi === i;
+    ctx.strokeStyle = hl ? C.bound : 'rgba(169,198,255,0.55)'; ctx.lineWidth = hl ? 3 : 2; ctx.beginPath(); ctx.moveTo(x1, y); ctx.lineTo(x2, y); ctx.stroke();
+    txt(ctx, nm, x1 - 10, y + 5, { size: 14, w: 600, f: 'disp', color: hl ? C.bound : C.text, align: 'right' });
+    txt(ctx, fmtE(E), x2 + 8, y + 4, { size: 11.5, f: 'mono', color: C.muted });
+    const holes = (st.holes && st.holes[i]) || 0; const mid = (x1 + x2) / 2;
+    for (let k = 0; k < 2; k++) { const xx = mid - 10 + k * 20; if (k < holes) { ctx.strokeStyle = C.red; ctx.lineWidth = 1.6; ctx.beginPath(); ctx.arc(xx, y, 4.5, 0, 7); ctx.stroke(); if (hs) hs.push({ x: xx, y, r: 9, kind: 'hole', data: { el, i } }); } else glow(ctx, xx, y, 2.8, C.bound, 1); }
+    if (hs) hs.push({ x: x1 + 20, y, r: 10, kind: 'level', data: { el, i } });
+  });
+  (st.arrows || []).forEach((ar, j) => {
+    if (ar.u <= 0) return; const xa = x1 + 28 + j * 26; const ya = ar.to === 'vac' ? top - 18 : ys[ar.to]; const yb = ys[ar.from];
+    const yEnd = lerp(yb, ya, ease(ar.u)); arrow(ctx, xa, yb, xa, yEnd, ar.col, { w: 2.5, head: 8 });
+    if (ar.u > 0.6 && ar.label) pill(ctx, ar.label, xa + 10, (ya + yb) / 2, { color: ar.col, size: 11, a: seg(ar.u, 0.6, 1) });
+  });
+  ctx.restore(); return ys;
+}
+
+function chartAxes(ctx, box, o) {
+  panel(ctx, box.x, box.y, box.w, box.h, o.a ?? 1);
+  txt(ctx, o.title, box.x + 14, box.y + 20, { size: 10.5, w: 600, f: 'mono', color: C.muted, a: o.a });
+  const px = { x0: box.x + 40, x1: box.x + box.w - 16, y0: box.y + box.h - 30, y1: box.y + 36 };
+  ctx.save(); ctx.globalAlpha *= o.a ?? 1; ctx.strokeStyle = 'rgba(160,185,210,0.35)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(px.x0, px.y1); ctx.lineTo(px.x0, px.y0); ctx.lineTo(px.x1, px.y0); ctx.stroke(); ctx.restore();
+  return px;
+}
+function drawMoseley(ctx, box, ph, a) {
+  const px = chartAxes(ctx, box, { title: "MOSELEY'S LAW · √E(Kα) vs Z", a });
+  const X = z => lerp(px.x0, px.x1, z / 85), Y = v => lerp(px.y0, px.y1, v / 9);
+  ctx.save(); ctx.globalAlpha *= a;
+  [0, 20, 40, 60, 80].forEach(z => txt(ctx, String(z), X(z), px.y0 + 14, { size: 10, f: 'mono', color: C.faint, align: 'center' }));
+  [0, 3, 6, 9].forEach(v => txt(ctx, String(v), px.x0 - 6, Y(v) + 3, { size: 10, f: 'mono', color: C.faint, align: 'right' }));
+  txt(ctx, 'Z', px.x1, px.y0 + 14, { size: 10.5, f: 'mono', color: C.muted, align: 'right' });
+  ctx.strokeStyle = hexA(C.mag, 0.5); ctx.setLineDash([5, 4]); ctx.beginPath(); ctx.moveTo(X(1), Y(0)); ctx.lineTo(X(85), Y(0.101 * 84)); ctx.stroke(); ctx.setLineDash([]);
+  EL_ORDER.forEach(s => { const e = ELEMENTS[s], ka = e.lines[0].E; const on = e === ph.el || e === ph.el2; const x = X(e.Z), y = Y(Math.sqrt(ka));
+    if (on) { glow(ctx, x, y, 4, C.mag, 1); txt(ctx, `${s} · ${fmtE(ka)}`, x - 8, y - 10, { size: 11, w: 600, f: 'mono', color: C.mag, align: 'right' }); }
+    else { ctx.fillStyle = 'rgba(228,235,243,0.55)'; ctx.beginPath(); ctx.arc(x, y, 3, 0, 7); ctx.fill(); txt(ctx, s, x + 6, y + 4, { size: 10, f: 'mono', color: C.muted }); } });
+  txt(ctx, 'E(Kα) ≈ 10.2 eV · (Z − 1)²', px.x0 + 8, px.y1 + 8, { size: 11, f: 'mono', color: C.text });
+  ctx.restore();
+}
+function drawYield(ctx, box, ph, sh, a) {
+  const px = chartAxes(ctx, box, { title: `${SHELL[sh]}-SHELL YIELD · X-RAY vs AUGER`, a });
+  const X = z => lerp(px.x0, px.x1, z / 90), Y = v => lerp(px.y0, px.y1, v);
+  ctx.save(); ctx.globalAlpha *= a;
+  [0, 30, 60, 90].forEach(z => txt(ctx, String(z), X(z), px.y0 + 14, { size: 10, f: 'mono', color: C.faint, align: 'center' }));
+  [0, 0.5, 1].forEach(v => txt(ctx, v.toFixed(1), px.x0 - 6, Y(v) + 3, { size: 10, f: 'mono', color: C.faint, align: 'right' }));
+  const curve = (fn, col) => { ctx.strokeStyle = col; ctx.lineWidth = 2.2; ctx.beginPath(); for (let z = 1; z <= 90; z += 1) { const x = X(z), y = Y(fn(z)); z === 1 ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke(); };
+  curve(z => omega(z, sh), C.mag); curve(z => 1 - omega(z, sh), C.auger);
+  txt(ctx, 'X-ray (ω)', X(84), Y(omega(84, sh)) - 8, { size: 10.5, f: 'mono', color: C.mag, align: 'right' });
+  txt(ctx, 'Auger (1 − ω)', X(84), Y(1 - omega(84, sh)) + 16, { size: 10.5, f: 'mono', color: C.auger, align: 'right' });
+  const Z = ph.el.Z, w = omega(Z, sh); ctx.strokeStyle = 'rgba(228,235,243,0.4)'; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(Z), px.y0); ctx.lineTo(X(Z), px.y1); ctx.stroke(); ctx.setLineDash([]);
+  glow(ctx, X(Z), Y(w), 4, C.mag, 1); glow(ctx, X(Z), Y(1 - w), 4, C.auger, 1);
+  const lx = Z > 55 ? X(Z) - 8 : X(Z) + 8, al = Z > 55 ? 'right' : 'left';
+  txt(ctx, `${ph.el.sym}: ω = ${w < 0.01 ? w.toFixed(4) : w.toFixed(2)}`, lx, px.y1 + 12, { size: 11.5, w: 600, f: 'mono', color: C.text, align: al });
+  txt(ctx, `${(w * 100).toFixed(w < 0.01 ? 2 : 0)}% X-ray · ${((1 - w) * 100).toFixed(w < 0.01 ? 2 : 0)}% Auger`, lx, px.y1 + 28, { size: 10.5, f: 'mono', color: C.muted, align: al });
+  ctx.restore();
+}
+
+/* =====================================================================
+   6 · SCENES — every frame is a pure function of (time, parameters)
+   ===================================================================== */
+const trajCache = new Map();
+function getTraj(Z) {
+  const key = Z.toFixed(1); if (trajCache.has(key)) return trajCache.get(key);
+  const N = 64, out = [], sig = 0.28 + 0.013 * Z, pBig = 0.02 + 0.004 * Z, steps = 34;
+  for (let k = 0; k < N; k++) {
+    let x = 0, y = 0, th = gauss(k * 3.3) * 0.05; const pts = [{ x, y, e: 1 }];
+    for (let j = 0; j < steps; j++) {
+      let d = gauss(k * 977 + j * 31.7) * sig; if (hash(k * 131 + j * 7.7) < pBig) d = (hash(k * 53 + j * 3.1) * 2 - 1) * Math.PI;
+      th += d; x += Math.sin(th) * 0.05; y += Math.cos(th) * 0.05; pts.push({ x, y, e: 1 - (j + 1) / steps });
+      if (y < 0) { pts[pts.length - 1].y = 0; pts.esc = true; break; }
+    }
+    out.push(pts);
+  }
+  const depths = out.map(p => Math.max(...p.map(q => q.y))).sort((a, b) => a - b); const d90 = depths[Math.floor(N * 0.9)] || 1;
+  out.forEach(p => p.forEach(q => { q.x /= d90; q.y /= d90; }));
+  trajCache.set(key, out); return out;
+}
+
+function scene1(ctx, lt, T, P, hs) {
+  const { ph } = P, surfY = 205, bx = 480, v = ph.beta, R = ph.R;
+  // specimen block
+  const gr = ctx.createLinearGradient(0, surfY, 0, 540); gr.addColorStop(0, '#18212d'); gr.addColorStop(1, '#0a0f15');
+  ctx.fillStyle = gr; ctx.fillRect(0, surfY, 960, 540 - surfY);
+  ctx.strokeStyle = 'rgba(150,190,230,0.55)'; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(0, surfY); ctx.lineTo(960, surfY); ctx.stroke();
+  // pole piece
+  ctx.fillStyle = '#1a2330'; ctx.strokeStyle = 'rgba(150,180,210,0.3)';
+  [[-1], [1]].forEach(([s]) => { ctx.beginPath(); ctx.moveTo(bx + s * 22, 52); ctx.lineTo(bx + s * 150, 52); ctx.lineTo(bx + s * 190, 0); ctx.lineTo(bx + s * 40, 0); ctx.closePath(); ctx.fill(); ctx.stroke(); });
+  txt(ctx, 'objective pole piece', bx - 170, 30, { size: 10.5, f: 'mono', color: C.faint, align: 'right' });
+  // beam cone
+  const ba = 0.35 + 0.65 * seg(lt, 0, 1.5);
+  ctx.save(); ctx.globalAlpha = ba; const cg = ctx.createLinearGradient(0, 52, 0, surfY); cg.addColorStop(0, hexA(C.cyan, 0.05)); cg.addColorStop(1, hexA(C.cyan, 0.28));
+  ctx.fillStyle = cg; ctx.beginPath(); ctx.moveTo(bx - 16, 52); ctx.lineTo(bx + 16, 52); ctx.lineTo(bx + 1.5, surfY); ctx.lineTo(bx - 1.5, surfY); ctx.closePath(); ctx.fill(); ctx.restore();
+  const speed = 160 + 1000 * v, L = surfY - 52;
+  for (let i = 0; i < 12; i++) { const s = ((T * speed) / L + i / 12) % 1; const y = 52 + s * L, x = bx + (hash(i) * 2 - 1) * 14 * (1 - s); glow(ctx, x, y, 2.6, C.cyan, ba); if (i % 3 === 0) hs.push({ x, y, r: 10, kind: 'primary', tag: i === 0 ? 'Primary electron' : null }); }
+  glow(ctx, bx, surfY, 5, C.cyan, ba * (0.7 + 0.3 * Math.sin(T * 9)));
+  // beam readout
+  const aR = seg(lt, 1, 2.5);
+  if (aR > 0) { panel(ctx, 16, 16, 206, 74, aR); txt(ctx, 'BEAM', 30, 36, { size: 10.5, w: 600, f: 'mono', color: C.muted, a: aR }); txt(ctx, `E₀  ${ph.E0.toFixed(1)} kV`, 30, 56, { size: 13, f: 'mono', color: C.cyan, a: aR }); txt(ctx, `v   ${ph.beta.toFixed(3)} c   λ ${ph.lambda.toFixed(2)} pm`, 30, 76, { size: 12, f: 'mono', color: C.text, a: aR }); }
+  // SEM / TEM annotation
+  const a2 = seg(lt, 6, 7) * (1 - seg(lt, 12.3, 13.2));
+  if (a2 > 0) {
+    ctx.save(); ctx.globalAlpha = a2;
+    [[300, -0.5], [640, 0.45]].forEach(([x, k]) => arrow(ctx, x, surfY - 8, x + k * 40, surfY - 80, C.se, { w: 2, head: 9 }));
+    txt(ctx, 'SEM', 150, 150, { size: 20, w: 600, f: 'disp', color: C.se }); txt(ctx, 'collects signals leaving', 150, 170, { size: 12, color: C.text }); txt(ctx, 'the top surface', 150, 186, { size: 12, color: C.text });
+    ctx.strokeStyle = hexA(C.violet, 0.8); ctx.setLineDash([6, 5]); ctx.beginPath(); ctx.moveTo(40, 470); ctx.lineTo(920, 470); ctx.stroke(); ctx.setLineDash([]);
+    arrow(ctx, bx, 420, bx, 520, C.violet, { w: 2.5, head: 10 });
+    txt(ctx, 'TEM', 520, 455, { size: 20, w: 600, f: 'disp', color: C.violet }); txt(ctx, 'thin foil (≈100 nm): signals are collected below,', 520, 492, { size: 12, color: C.text }); txt(ctx, 'after transmission', 520, 508, { size: 12, color: C.text });
+    ctx.restore();
+  }
+  // interaction volume (Monte Carlo trajectories)
+  const nice = niceCeil(R), pxPerUm = 285 / nice, pxR = R * pxPerUm;
+  if (lt > 12.5) {
+    const traj = getTraj(ph.Zbar), N = traj.length, shown = seg(lt, 12.5, 23) * N;
+    ctx.save(); ctx.lineWidth = 1.1;
+    for (let k = 0; k < N; k++) {
+      const fr = clamp(shown - k); if (fr <= 0) break; const pts = traj[k], m = Math.max(2, Math.floor(pts.length * fr));
+      for (let j = 1; j < m; j++) { const e = pts[j].e; ctx.strokeStyle = `hsla(${190 + 85 * (1 - e)},90%,${55 + 10 * e}%,${0.18 + 0.6 * e})`; ctx.beginPath(); ctx.moveTo(bx + pts[j - 1].x * pxR, surfY + pts[j - 1].y * pxR); ctx.lineTo(bx + pts[j].x * pxR, surfY + pts[j].y * pxR); ctx.stroke(); }
+      if (pts.esc && fr >= 1) { const q = pts[pts.length - 1]; glow(ctx, bx + q.x * pxR, surfY, 2, C.amber, 0.8); }
+    }
+    ctx.restore();
+    hs.push({ x: bx, y: surfY + pxR * 0.5, r: Math.max(24, pxR * 0.4), kind: 'volume', tag: 'Interaction volume' });
+    const aV = seg(lt, 14, 15.5);
+    // depth ruler
+    const rx = bx - pxR * 0.95 - 26; ctx.save(); ctx.globalAlpha = aV; ctx.strokeStyle = 'rgba(228,235,243,0.55)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(rx, surfY); ctx.lineTo(rx, surfY + pxR); ctx.moveTo(rx - 5, surfY + pxR); ctx.lineTo(rx + 5, surfY + pxR); ctx.stroke(); ctx.restore();
+    txt(ctx, `R = ${fmtLen(R)}`, rx - 8, surfY + pxR * 0.5 + 4, { size: 13, w: 600, f: 'mono', color: C.text, align: 'right', a: aV });
+    txt(ctx, 'Kanaya–Okayama', rx - 8, surfY + pxR * 0.5 + 20, { size: 10.5, f: 'mono', color: C.muted, align: 'right', a: aV });
+    // scale bar
+    const sb = (nice / 2) * pxPerUm; ctx.save(); ctx.globalAlpha = aV; ctx.fillStyle = C.text; ctx.fillRect(40, 520, sb, 3); ctx.restore();
+    txt(ctx, fmtLen(nice / 2), 40 + sb + 8, 525, { size: 11, f: 'mono', color: C.text, a: aV });
+  }
+  txt(ctx, `${ph.label} · Z̄ ${ph.Zbar.toFixed(1)} · ρ ${ph.rho.toFixed(2)} g/cm³`, 40, 505, { size: 11.5, f: 'mono', color: C.muted, a: lt > 12.5 ? 1 : 0.8 * (1 - (seg(lt, 6, 7) * (1 - seg(lt, 12.3, 13.2)))) });
+  // emitted signals
+  if (lt > 13) {
+    const per = 0.16, j1 = Math.floor((lt - 13) / per);
+    for (let j = Math.max(0, j1 - 9); j <= j1; j++) {
+      const age = lt - (13 + j * per); if (age < 0 || age > 1.4) continue;
+      const r = hash(j * 3.7 + 1), ang = -Math.PI / 2 + (hash(j * 9.1 + 2) * 2 - 1) * 1.25;
+      if (r < 0.45) { const d = Math.min(80, age * 95); const x = bx + Math.cos(ang) * d, y = surfY + Math.sin(ang) * d; glow(ctx, x, y, 2.2, C.se, 1 - seg(age, 0.9, 1.4)); hs.push({ x, y, r: 9, kind: 'se' }); }
+      else if (r < 0.75) { const d = age * 260; const x = bx + Math.cos(ang) * d, y = surfY + Math.sin(ang) * d; if (onScreen(x, y)) { glow(ctx, x, y, 2.6, C.amber, 1); hs.push({ x, y, r: 9, kind: 'bse' }); } }
+      else { const l = ph.el.lines[0]; const E = ph.s0 >= 0 ? (ph.el.lines.find(q => q.sh === ph.s0) || l).E : l.E; const hd = photon(ctx, bx, surfY, ang, age * 300, E, 0.9); hs.push({ x: hd[0], y: hd[1], r: 10, kind: 'xray', data: { E, src: `${ph.el.sym} ${(ph.el.lines.find(q => q.E === E) || l).n}` } }); }
+    }
+  }
+  // signal depth zones
+  if (lt > 26) {
+    const zones = [
+      { nm: 'Auger electrons', d: 0.002, col: C.auger, t: '≈ 0.5–3 nm' },
+      { nm: 'Secondary electrons', d: 0.03, col: C.se, t: '≈ 5–50 nm' },
+      { nm: 'Backscattered e⁻', d: 0.3 * R, col: C.amber, t: `≈ 0.3 R · ${fmtLen(0.3 * R)}` },
+      { nm: 'Characteristic X-rays', d: ph.Rx, col: C.mag, t: `Rₓ ≈ ${fmtLen(ph.Rx)}` },
+      { nm: 'Continuum X-rays', d: R, col: C.violet, t: `≈ R · ${fmtLen(R)}` },
+    ];
+    zones.forEach((z, i) => {
+      const a = seg(lt, 26 + i * 1.1, 27 + i * 1.1); if (a <= 0) return;
+      const depth = Math.max(3, Math.min(pxR, (z.d / R) * pxR)), xb = 770 + i * 8, yl = surfY + 26 + i * 50;
+      ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = z.col; ctx.fillRect(xb - 2, surfY, 4, depth);
+      ctx.strokeStyle = hexA(z.col, 0.35); ctx.setLineDash([2, 4]); ctx.beginPath(); ctx.moveTo(bx - pxR * 0.7, surfY + depth); ctx.lineTo(xb - 4, surfY + depth); ctx.stroke(); ctx.setLineDash([]);
+      ctx.strokeStyle = hexA(z.col, 0.6); ctx.beginPath(); ctx.moveTo(xb + 2, surfY + depth); ctx.lineTo(818, yl - 4); ctx.stroke(); ctx.restore();
+      txt(ctx, z.nm, 822, yl - 2, { size: 12, w: 600, color: z.col, a }); txt(ctx, z.t, 822, yl + 13, { size: 10.5, f: 'mono', color: C.muted, a });
+    });
+  }
+}
+
+function scene2(ctx, lt, T, P, hs) {
+  const { ph } = P, el = ph.el, s0 = ph.s0, cx = 300, cy = 292;
+  const sc = lerp(0.42, 1, easeOut(seg(lt, 0, 3.2))), ti = 16.5, Tti = T - lt + ti;
+  const missing = new Set(), holes = [];
+  if (s0 >= 0 && lt >= ti) { missing.add(`${s0}:0`); holes.push([s0, 0, 1]); }
+  let hi = -1; if (lt > 3 && lt < 7) hi = Math.min(el.levels.length - 1, Math.floor((lt - 3) / 1.1)); if (lt >= 7 && lt < 12.5) hi = s0;
+  drawAtom(ctx, el, cx, cy, sc, T, { missing, holes, hi, hs, labels: lt > 2.2, showE: lt > 3 && lt < 12.5, target: s0 >= 0 && lt > 12.5 && lt < ti ? [s0, 0] : null, tagNucleus: true, tagHole: true });
+  txt(ctx, `${el.name} · Z = ${el.Z}`, cx, 520, { size: 13, w: 600, f: 'disp', color: C.muted, align: 'center', a: seg(lt, 1, 2.5) });
+  if (s0 >= 0 && lt > 12.8) {
+    const S = [34, 64], P1 = atomPos(el, cx, cy, 1, s0, 0, Tti);
+    if (lt < ti) {
+      const u = seg(lt, 12.8, ti), x = lerp(S[0], P1[0], u), y = lerp(S[1], P1[1], u);
+      trail(ctx, [S, [lerp(S[0], x, 0.5), lerp(S[1], y, 0.5)], [x, y]], C.cyan, 2, 0.8); glow(ctx, x, y, 4, C.cyan, 1);
+      hs.push({ x, y, r: 12, kind: 'primary', tag: 'Primary electron' });
+      pill(ctx, `E₀ = ${ph.E0.toFixed(1)} keV`, x + 14, y - 16, { color: C.cyan, size: 11 });
+    } else {
+      const dx = P1[0] - S[0], dy = P1[1] - S[1], dl = Math.hypot(dx, dy); const ang = Math.atan2(dy, dx) + 0.38;
+      const sp = 260 * Math.sqrt(Math.max(0.05, 1 - ph.Ec / ph.E0)), d = (lt - ti) * sp; const x = P1[0] + Math.cos(ang) * d, y = P1[1] + Math.sin(ang) * d;
+      if (onScreen(x, y)) { trail(ctx, [P1, [x, y]], C.cyan, 1.5, 0.45); glow(ctx, x, y, 3.4, C.cyan, 0.75); hs.push({ x, y, r: 12, kind: 'primary', data: { after: true } }); if (lt < 23) pill(ctx, `E ≤ E₀ − ${fmtE(ph.Ec)}`, x + 12, y + 16, { color: C.cyan, size: 11, a: seg(lt, ti + 0.6, ti + 1.4) }); }
+      const out = Math.atan2(P1[1] - cy, P1[0] - cx) - 0.3, d2 = (lt - ti) * 170, x2 = P1[0] + Math.cos(out) * d2, y2 = P1[1] + Math.sin(out) * d2;
+      if (onScreen(x2, y2)) { trail(ctx, [P1, [x2, y2]], C.bound, 1.5, 0.5); glow(ctx, x2, y2, 3.4, C.bound, 1); hs.push({ x: x2, y: y2, r: 12, kind: 'ejected', data: { el, i: s0 }, tag: lt < 21 ? `ejected ${SHELL[s0]} electron` : null }); }
+      // impact flash
+      const fl = 1 - seg(lt, ti, ti + 0.5); if (fl > 0) glow(ctx, P1[0], P1[1], 10, '#ffffff', fl);
+    }
+  }
+  const aL = seg(lt, 2, 3.5) * (1 - seg(lt, 23, 24));
+  drawLevels(ctx, el, { x: 610, y: 64, w: 326, h: 380 }, { a: aL, hi, holes: s0 >= 0 && lt >= ti ? { [s0]: 1 } : {} }, aL > 0.5 ? hs : null, ph.E0);
+  const aE = seg(lt, 23.5, 24.6);
+  if (aE > 0 && s0 >= 0) drawEELS(ctx, { x: 600, y: 80, w: 336, h: 250 }, ph, seg(lt, 24, 28), aE, hs);
+  if (aE > 0 && s0 >= 0) { const a = aE * seg(lt, 25, 26); panel(ctx, 600, 346, 336, 74, a); txt(ctx, `E₀ = ${ph.E0.toFixed(3)} keV`, 616, 372, { size: 12.5, f: 'mono', color: C.cyan, a }); txt(ctx, `ΔE ≥ E_${SHELL[s0]} = ${fmtE(ph.Ec)}  →  E ≤ ${fmtE(ph.E0 - ph.Ec)}`, 616, 396, { size: 12, f: 'mono', color: C.text, a }); }
+  if (s0 > 0 && lt > 10.5) warn(ctx, `E₀ = ${ph.E0} kV is below the ${el.sym} K edge (${fmtE(el.levels[0][1])}): the ${SHELL[s0]} shell is ionized instead`, seg(lt, 10.5, 11.5));
+  if (s0 < 0 && lt > 10.5) warn(ctx, `E₀ is too low to ionize any inner shell of ${el.name}`, 1);
+}
+
+function drawEELS(ctx, box, ph, prog, a, hs) {
+  const Ek = ph.Ec, sh = SHELL[ph.s0];
+  const px = chartAxes(ctx, box, { title: 'EELS · ENERGY LOST BY THE PRIMARY (TEM)', a });
+  const Emax = Ek * 1.8, X = E => lerp(px.x0, px.x1, E / Emax), Y = v => lerp(px.y0, px.y1, clamp(v));
+  ctx.save(); ctx.globalAlpha *= a;
+  const f = E => { const bg = 0.55 * Math.pow(Math.max(E, 0.02 * Ek) / (0.35 * Ek), -2.2); const edge = E > Ek ? 0.32 * Math.pow(Ek / E, 1.4) * (1 - Math.exp(-(E - Ek) / (0.025 * Ek))) : 0; return bg * 0.35 + edge; };
+  ctx.strokeStyle = C.bound; ctx.lineWidth = 2; ctx.beginPath(); const Eend = Emax * prog;
+  for (let E = 0.03 * Ek; E <= Eend; E += Emax / 300) { const x = X(E), y = Y(f(E)); E <= 0.031 * Ek ? ctx.moveTo(x, y) : ctx.lineTo(x, y); } ctx.stroke();
+  ctx.fillStyle = C.cyan; ctx.fillRect(X(0) + 1, px.y1, 4, px.y0 - px.y1); txt(ctx, 'zero-loss peak', X(0) + 10, px.y1 + 10, { size: 10.5, f: 'mono', color: C.cyan });
+  if (prog > Ek / Emax) { ctx.strokeStyle = hexA(C.red, 0.8); ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.moveTo(X(Ek), px.y0); ctx.lineTo(X(Ek), px.y1 + 20); ctx.stroke(); ctx.setLineDash([]); pill(ctx, `${sh} edge · ${fmtE(Ek)}`, X(Ek) + 6, px.y1 + 22, { color: C.red, size: 11 }); hs.push({ x: X(Ek), y: Y(f(Ek * 1.05)), r: 16, kind: 'eels', data: { Ek, sh } }); }
+  txt(ctx, 'energy loss ΔE →', px.x1, px.y0 + 16, { size: 10.5, f: 'mono', color: C.muted, align: 'right' });
+  ctx.restore();
+}
+
+function scene3(ctx, lt, T, P, hs) {
+  const { ph } = P, el = ph.el, s0 = ph.s0, cx = 300, cy = 292;
+  if (s0 < 0) { drawAtom(ctx, el, cx, cy, 1, T, { hs, labels: true }); warn(ctx, 'No inner shell can be ionized at this beam energy', 1); return; }
+  const shL = el.lines.filter(l => l.sh === s0), La = shL[0], Lb = shL[1] || null;
+  const evs = [{ L: La, idx: 0, t0: 6, t1: 9 }, Lb ? { L: Lb, idx: Math.min(2, el.counts[Lb.from] - 1), t0: 13.5, t1: 16.5 } : null];
+  const missing = new Set(), holes = [], lvHoles = {}, arrows = []; let moving = null, ph0 = null;
+  const ev = lt < 12.5 ? evs[0] : lt < 19.5 ? evs[1] : null;
+  if (lt < 19.5) {
+    if (ev) {
+      const f = ev.L.from, u = seg(lt, ev.t0, ev.t1);
+      if (lt < ev.t1) { missing.add(`${s0}:0`); holes.push([s0, 0, 1]); lvHoles[s0] = 1; } else { holes.push([f, ev.idx, 0.7]); lvHoles[f] = 1; }
+      if (lt >= ev.t0) missing.add(`${f}:${ev.idx}`);
+      if (lt >= ev.t0 && lt < ev.t1) { const pa = atomPos(el, cx, cy, 1, f, ev.idx, T), pb = atomPos(el, cx, cy, 1, s0, 0, T), e = ease(u); moving = [lerp(pa[0], pb[0], e), lerp(pa[1], pb[1], e), f]; }
+      arrows.push({ from: f, to: s0, u, col: photonColor(ev.L.E), label: `${ev.L.n} = E${SHELL[s0]} − E${SHELL[f]}` });
+      if (lt >= ev.t1) ph0 = { P0: atomPos(el, cx, cy, 1, s0, 0, T - lt + ev.t1), d: (lt - ev.t1) * 230, L: ev.L };
+    } else { missing.add(`${s0}:0`); holes.push([s0, 0, 1]); lvHoles[s0] = 1; }
+  }
+  drawAtom(ctx, el, cx, cy, 1, T, { missing, holes, hs, labels: true, tagHole: lt < 6, tagNucleus: false });
+  if (lt < 6) { const hp = atomPos(el, cx, cy, 1, s0, 0, T); pill(ctx, 'unstable: vacancy', hp[0] + 16, hp[1] - 18, { color: C.red, size: 11, a: seg(lt, 0.5, 1.5) }); }
+  if (moving) { glow(ctx, moving[0], moving[1], 4, C.bound, 1); hs.push({ x: moving[0], y: moving[1], r: 12, kind: 'bound', data: { el, i: moving[2] }, tag: `${SHELL[moving[2]]} electron dropping` }); }
+  if (ph0 && ph0.d < 900) { const col = photonColor(ph0.L.E); const hd = photon(ctx, ph0.P0[0], ph0.P0[1], -0.32, ph0.d, ph0.L.E, 1); glow(ctx, ph0.P0[0], ph0.P0[1], 8, col, 1 - seg(ph0.d, 0, 90)); if (onScreen(hd[0], hd[1])) { pill(ctx, `${el.sym} ${ph0.L.n} · ${fmtE(ph0.L.E)}`, hd[0] + 10, hd[1] - 20, { color: col, size: 12 }); hs.push({ x: hd[0], y: hd[1], r: 16, kind: 'xray', data: { E: ph0.L.E, src: `${el.sym} ${ph0.L.n}` }, tag: null }); } }
+  if (lt >= 12.5 && lt < 14) pill(ctx, 'another atom · another vacancy', cx, 70, { color: C.muted, align: 'center', size: 11, f: 'sans', a: 1 - seg(lt, 13.4, 14) });
+  if (!Lb && lt >= 12.5 && lt < 19.5) warn(ctx, `No ${SHELL[s0]}β here: ${el.name} has ${el.levels.length <= 2 ? 'no M-shell electrons' : 'no second strong line from this shell'} to fill the vacancy`, seg(lt, 12.6, 13.4));
+  if (s0 > 0 && lt < 12) warn(ctx, `K shell out of reach at ${ph.E0} kV: showing ${SHELL[s0]}-shell emission`, seg(lt, 0.3, 1));
+  // statistics (19.5+)
+  if (lt >= 19.5) {
+    const pb = Lb ? Lb.rel / (1 + Lb.rel) : 0, per = 0.3, kmax = Math.floor((lt - 19.5) / per); let nA = 0, nB = 0;
+    for (let k = 0; k <= kmax; k++) { const isB = hash(k * 5.3 + 7) < pb; isB ? nB++ : nA++; const age = lt - (19.5 + k * per); if (age > 2.4) continue;
+      const L = isB ? Lb : La, ang = -1.3 + hash(k * 2.1 + 3) * 2.4, d = age * 260; const hd = photon(ctx, cx, cy, ang, d + 30, L.E, 1 - seg(age, 1.8, 2.4)); if (onScreen(hd[0], hd[1])) hs.push({ x: hd[0], y: hd[1], r: 10, kind: 'xray', data: { E: L.E, src: `${el.sym} ${L.n}` } }); }
+    const a = seg(lt, 19.6, 20.4), tot = Math.max(1, nA + nB), bw = 300;
+    panel(ctx, 40, 462, 440, 66, a);
+    [[La, nA, 482], [Lb, nB, 508]].forEach(([L, n, y]) => { if (!L) { txt(ctx, `${SHELL[s0]}β  —  not emitted`, 56, y + 4, { size: 11.5, f: 'mono', color: C.faint, a }); return; } const col = photonColor(L.E); txt(ctx, L.n, 56, y + 4, { size: 12, w: 600, f: 'mono', color: col, a }); ctx.save(); ctx.globalAlpha = a; ctx.fillStyle = hexA(col, 0.2); ctx.fillRect(92, y - 6, bw, 12); ctx.fillStyle = col; ctx.fillRect(92, y - 6, (bw * n) / tot, 12); ctx.restore(); txt(ctx, String(n), 400, y + 4, { size: 11.5, f: 'mono', color: C.text, a }); });
+    if (Lb) txt(ctx, `I(${Lb.n})/I(${La.n}) ≈ ${Lb.rel.toFixed(2)}`, 430, 498, { size: 11, f: 'mono', color: C.muted, a, align: 'center' });
+  }
+  const aL = seg(lt, 0.5, 1.5) * (1 - seg(lt, 25, 26));
+  drawLevels(ctx, el, { x: 610, y: 64, w: 326, h: 380 }, { a: aL, holes: lvHoles, arrows }, aL > 0.5 ? hs : null, 0);
+  const aM = seg(lt, 25.5, 26.5); if (aM > 0) drawMoseley(ctx, { x: 600, y: 70, w: 336, h: 330 }, ph, aM);
+}
+
+function scene4(ctx, lt, T, P, hs) {
+  const { ph } = P, el = ph.el, s0 = Math.max(0, ph.s0), cx = 300, cy = 292, s1 = s0 + 1;
+  const i1 = 0, i2 = Math.floor(el.counts[s1] / 2), aAtom = 1 - seg(lt, 18, 19);
+  const missing = new Set(), holes = [], lvHoles = {}; let moving = null;
+  if (lt < 4.5) { missing.add(`${s0}:0`); holes.push([s0, 0, 1]); lvHoles[s0] = 1; }
+  if (lt >= 1.5) missing.add(`${s1}:${i1}`);
+  if (lt >= 1.5 && lt < 4.5) { const pa = atomPos(el, cx, cy, 1, s1, i1, T), pb = atomPos(el, cx, cy, 1, s0, 0, T), e = ease(seg(lt, 1.5, 4.5)); moving = [lerp(pa[0], pb[0], e), lerp(pa[1], pb[1], e)]; }
+  if (lt >= 4.5) { holes.push([s1, i1, 0.8]); lvHoles[s1] = 1; }
+  if (lt >= 6.5) { missing.add(`${s1}:${i2}`); holes.push([s1, i2, 0.8]); lvHoles[s1] = 2; }
+  drawAtom(ctx, el, cx, cy, 1, T, { missing, holes, hs, labels: true, a: aAtom });
+  const Eaug = Math.max(0.005, el.levels[s0][1] - 2 * el.levels[s1][1]), nm = `${SHELL[s0]}${SHELL[s1]}${SHELL[s1]}`;
+  if (aAtom > 0) {
+    if (moving) glow(ctx, moving[0], moving[1], 4, C.bound, aAtom);
+    if (lt >= 4.5 && lt < 6.5) { // internal energy hand-off
+      const pa = atomPos(el, cx, cy, 1, s0, 0, T - lt + 4.5), pb = atomPos(el, cx, cy, 1, s1, i2, T), u = ease(seg(lt, 4.5, 6.5));
+      const mx = (pa[0] + pb[0]) / 2 + (cy - (pa[1] + pb[1]) / 2) * 0.4, my = (pa[1] + pb[1]) / 2 + ((pa[0] + pb[0]) / 2 - cx) * 0.4;
+      ctx.save(); ctx.globalAlpha = aAtom; ctx.strokeStyle = hexA(C.amber, 0.6); ctx.setLineDash([4, 4]); ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(pa[0], pa[1]); ctx.quadraticCurveTo(mx, my, pb[0], pb[1]); ctx.stroke(); ctx.setLineDash([]); ctx.restore();
+      const qx = (1 - u) * (1 - u) * pa[0] + 2 * (1 - u) * u * mx + u * u * pb[0], qy = (1 - u) * (1 - u) * pa[1] + 2 * (1 - u) * u * my + u * u * pb[1];
+      glow(ctx, qx, qy, 6, C.amber, aAtom); pill(ctx, 'energy handed off internally', qx + 14, qy - 16, { color: C.amber, size: 11, f: 'sans', a: aAtom });
+      const pbx = atomPos(el, cx, cy, 1, s1, i2, T); glow(ctx, pbx[0], pbx[1], 3.2, C.bound, aAtom);
+    }
+    if (lt >= 6.5) {
+      const P0 = atomPos(el, cx, cy, 1, s1, i2, T - lt + 6.5), ang = Math.atan2(P0[1] - cy, P0[0] - cx), d = (lt - 6.5) * 150, x = P0[0] + Math.cos(ang) * d, y = P0[1] + Math.sin(ang) * d;
+      if (onScreen(x, y)) { trail(ctx, [P0, [x, y]], C.auger, 2, 0.6 * aAtom); glow(ctx, x, y, 4.2, C.auger, aAtom); hs.push({ x, y, r: 13, kind: 'auger', data: { E: Eaug, nm }, tag: 'Auger electron' }); if (lt < 16) pill(ctx, `Auger ${nm} ≈ ${fmtE(Eaug)}`, x + 14, y - 16, { color: C.auger, size: 12, a: aAtom * seg(lt, 7, 8) }); }
+      if (lt > 8 && lt < 18) txt(ctx, `doubly ionized: ${el.sym}²⁺`, cx, 520, { size: 13, w: 600, f: 'disp', color: C.red, align: 'center', a: seg(lt, 8, 9) * aAtom });
+    }
+  }
+  const aL = seg(lt, 0.5, 1.5) * (1 - seg(lt, 11, 12));
+  drawLevels(ctx, el, { x: 610, y: 64, w: 326, h: 380 }, { a: aL, holes: lvHoles, arrows: [{ from: s1, to: s0, u: seg(lt, 1.5, 4.5), col: C.bound, label: 'drop in' }, { from: s1, to: 'vac', u: seg(lt, 6.5, 9), col: C.auger, label: 'Auger e⁻ out' }] }, aL > 0.5 ? hs : null, 0);
+  const aY = seg(lt, 11.5, 12.5); if (aY > 0) drawYield(ctx, { x: 600, y: 70, w: 336, h: 330 }, ph, s0, aY);
+  // surface sensitivity slab
+  const aS = seg(lt, 18.5, 19.5);
+  if (aS > 0) {
+    const sx0 = 40, sx1 = 560, sy = 170, ppn = 13.5; ctx.save(); ctx.globalAlpha = aS;
+    const g = ctx.createLinearGradient(0, sy, 0, sy + 20 * ppn); g.addColorStop(0, '#1a2430'); g.addColorStop(1, '#0b1016'); ctx.fillStyle = g; ctx.fillRect(sx0, sy, sx1 - sx0, 20 * ppn);
+    ctx.fillStyle = hexA(C.auger, 0.12); ctx.fillRect(sx0, sy, sx1 - sx0, 2.5 * ppn);
+    ctx.strokeStyle = 'rgba(150,190,230,0.6)'; ctx.beginPath(); ctx.moveTo(sx0, sy); ctx.lineTo(sx1, sy); ctx.stroke();
+    for (let nmD = 0; nmD <= 20; nmD += 5) { txt(ctx, `${nmD} nm`, sx0 - 4, sy + nmD * ppn + 4, { size: 10, f: 'mono', color: C.faint, align: 'right' }); ctx.strokeStyle = 'rgba(150,190,230,0.15)'; ctx.beginPath(); ctx.moveTo(sx0, sy + nmD * ppn); ctx.lineTo(sx1, sy + nmD * ppn); ctx.stroke(); }
+    ctx.restore();
+    txt(ctx, 'Auger escape depth ≈ 0.5–3 nm', sx1 - 4, sy - 12, { size: 12, w: 600, color: C.auger, align: 'right', a: aS });
+    txt(ctx, 'X-rays escape from µm depths', sx0 + 4, sy - 12, { size: 12, w: 600, color: C.mag, a: aS });
+    const per = 0.13, k1 = Math.floor((lt - 18.5) / per);
+    for (let k = Math.max(0, k1 - 14); k <= k1; k++) {
+      const age = lt - (18.5 + k * per); if (age < 0 || age > 1.8) continue;
+      const x = sx0 + 20 + hash(k * 1.7) * (sx1 - sx0 - 40), dnm = hash(k * 4.3 + 1) * 20, y0 = sy + dnm * ppn;
+      if (k % 5 === 0) { const hd = photon(ctx, x, y0, -Math.PI / 2 - 0.2, age * 220, 2 + hash(k) * 6, aS); if (hd[1] > -20) hs.push({ x: hd[0], y: hd[1], r: 10, kind: 'xray', data: { E: 5, src: 'deep X-ray' } }); continue; }
+      const escapes = dnm < 2.5, travel = escapes ? age * 170 : Math.min(age * 170, (1.2 + hash(k * 9.9) * 1.6) * ppn), y = y0 - travel;
+      const fade = escapes ? 1 - seg(age, 1.2, 1.8) : 1 - seg(age, 0.3, 0.8);
+      glow(ctx, x, y, 2.6, escapes ? C.auger : '#6b7a52', aS * fade);
+      if (!escapes && age > 0.25 && fade > 0.1) txt(ctx, '×', x + 5, y + 4, { size: 10, color: C.faint, a: aS * fade });
+      if (escapes && fade > 0.3) hs.push({ x, y, r: 9, kind: 'auger', data: { E: Eaug, nm } });
+    }
+  }
+}
+
+const bremCache = new Map();
+function bremTraj(b, Z, E0) {
+  const key = `${Math.round(b)}|${Z.toFixed(1)}|${E0}`; if (bremCache.has(key)) return bremCache.get(key);
+  const N = [430, 270], k = 3.1e6 * Math.sqrt(Z / 29) * Math.sqrt(20 / E0), dt = 1 / 200;
+  let x = -30, y = N[1] - b, vx = 300, vy = 0; const pts = []; let minD = 1e9, mi = 0;
+  for (let i = 0; i < 1000; i++) {
+    const dx = N[0] - x, dy = N[1] - y, r2 = dx * dx + dy * dy + 80, r = Math.sqrt(r2), a = k / r2;
+    vx += (a * dx / r) * dt; vy += (a * dy / r) * dt; x += vx * dt; y += vy * dt; pts.push([x, y, vx, vy]);
+    const d = Math.hypot(dx, dy); if (d < minD) { minD = d; mi = i; } if (x < -80 || x > 1040 || y < -80 || y > 620) break;
+  }
+  const last = pts[pts.length - 1], th = Math.abs(Math.atan2(last[3], last[2]));
+  const f = clamp(0.04 + 0.93 * Math.pow(th / Math.PI, 0.8), 0.04, 0.97);
+  const res = { pts, mi, f, dt }; bremCache.set(key, res); if (bremCache.size > 400) bremCache.clear(); return res;
+}
+function scene5(ctx, lt, T, P, hs) {
+  const { ph } = P, Z = ph.Zbar, E0 = ph.E0, NX = 430, NY = 270;
+  const g = ctx.createRadialGradient(NX, NY, 0, NX, NY, 60); g.addColorStop(0, '#ffe0b0'); g.addColorStop(0.35, '#ff8a4d'); g.addColorStop(1, 'rgba(255,90,60,0)');
+  ctx.fillStyle = g; ctx.beginPath(); ctx.arc(NX, NY, 60, 0, 7); ctx.fill();
+  ctx.strokeStyle = 'rgba(255,160,100,0.12)'; for (let r = 90; r < 260; r += 45) { ctx.beginPath(); ctx.arc(NX, NY, r, 0, 7); ctx.stroke(); }
+  txt(ctx, `+${Math.round(Z)}e`, NX, NY + 5, { size: 14, w: 700, f: 'mono', color: '#2a0d00', align: 'center' });
+  hs.push({ x: NX, y: NY, r: 24, kind: 'nucleus', data: { el: ph.el }, tag: 'Nucleus (Coulomb field)' });
+  const list = [{ b: 110, t: 0.3, demo: true }, { b: 70, t: 6.3 }, { b: -45, t: 7.3 }, { b: 28, t: 8.3 }, { b: -17, t: 9.3 }];
+  for (let j = 0; j < 40; j++) { const t = 11.5 + j * 0.5; if (t > lt) break; let b = (hash(j * 7.1 + 3) * 2 - 1) * 150; if (Math.abs(b) < 12) b = 12 * Math.sign(b || 1); list.push({ b, t }); }
+  const emitted = [];
+  list.forEach((e, idx) => {
+    const tau = lt - e.t; if (tau < 0) return; const tr = bremTraj(e.b, Z, E0), tE = tr.mi * tr.dt, slow = Math.sqrt(1 - tr.f);
+    const Eph = tr.f * E0; if (tau >= tE) emitted.push(Eph);
+    const idxF = tau < tE ? tau / tr.dt : tr.mi + ((tau - tE) * slow) / tr.dt; const i = Math.floor(idxF);
+    if (i < tr.pts.length) {
+      const pts = []; for (let q = Math.max(0, i - 45); q <= i; q += 3) pts.push([tr.pts[q][0], tr.pts[q][1]]); const p = tr.pts[i];
+      trail(ctx, pts, C.cyan, 1.6, tau < tE ? 0.9 : 0.5); glow(ctx, p[0], p[1], 3.4, C.cyan, tau < tE ? 1 : 0.6);
+      hs.push({ x: p[0], y: p[1], r: 11, kind: 'primary', tag: e.demo ? 'Primary electron' : null });
+    }
+    if (tau >= tE && tau - tE < 2.2) {
+      const pe = tr.pts[tr.mi], va = Math.atan2(pe[3], pe[2]), ang = va + (e.b > 0 ? -1 : 1) * (0.7 + hash(idx) * 0.6);
+      const hd = photon(ctx, pe[0], pe[1], ang, (tau - tE) * 250 + 10, Eph, 1 - seg(tau - tE, 1.7, 2.2));
+      if (onScreen(hd[0], hd[1])) { hs.push({ x: hd[0], y: hd[1], r: 12, kind: 'brems', data: { E: Eph } }); if (idx < 5) pill(ctx, `${fmtE(Eph)}`, hd[0] + 10, hd[1] - 16, { color: photonColor(Eph), size: 11, a: 1 - seg(tau - tE, 1.5, 2) }); }
+      if (tau - tE < 0.4) glow(ctx, pe[0], pe[1], 7, '#ffffff', 1 - (tau - tE) / 0.4);
+    }
+  });
+  if (lt > 6.5 && lt < 18) pill(ctx, 'closer pass → sharper bend → higher-energy photon', 480, 34, { color: C.amber, align: 'center', size: 11.5, f: 'sans', a: seg(lt, 6.8, 7.6) * (1 - seg(lt, 17, 18)) });
+  // continuum inset
+  const aK = seg(lt, 11.5, 12.5);
+  if (aK > 0) {
+    const box = { x: 590, y: 296, w: 346, h: 220 }, px = chartAxes(ctx, box, { title: 'BREMSSTRAHLUNG · I(E) ∝ Z (E₀ − E) / E', a: aK });
+    const X = E => lerp(px.x0, px.x1, E / E0), Y = v => lerp(px.y0, px.y1, clamp(v));
+    ctx.save(); ctx.globalAlpha = aK; const prog = seg(lt, 12, 17), Eend = Math.max(0.06 * E0, E0 * prog);
+    ctx.beginPath(); let first = true; for (let E = 0.06 * E0; E <= Eend; E += E0 / 200) { const v = ((E0 - E) / E) * 0.075; const x = X(E), y = Y(v); if (first) { ctx.moveTo(x, y); first = false; } else ctx.lineTo(x, y); }
+    ctx.strokeStyle = C.amber; ctx.lineWidth = 2.2; ctx.stroke(); ctx.lineTo(X(Eend), px.y0); ctx.lineTo(X(0.06 * E0), px.y0); ctx.closePath(); ctx.fillStyle = hexA(C.amber, 0.1); ctx.fill();
+    emitted.forEach(E => { ctx.fillStyle = photonColor(E); ctx.fillRect(X(E) - 1, px.y0 - 7, 2, 7); });
+    const ticks = E0 <= 10 ? [0, 2, 4, 6, 8, 10] : E0 <= 20 ? [0, 5, 10, 15, 20] : [0, 10, 20, 30];
+    ticks.filter(tk => tk <= E0 + 1e-6).forEach(tk => txt(ctx, String(tk), X(tk), px.y0 + 14, { size: 10, f: 'mono', color: C.faint, align: 'center' }));
+    txt(ctx, 'keV', px.x1, px.y0 + 26, { size: 10, f: 'mono', color: C.muted, align: 'right' });
+    const aD = seg(lt, 18, 19);
+    if (aD > 0) { const pulse = 0.6 + 0.4 * Math.sin(T * 6); ctx.globalAlpha = aK * aD; ctx.strokeStyle = C.red; ctx.lineWidth = 2; ctx.beginPath(); ctx.moveTo(X(E0) - 1, px.y0); ctx.lineTo(X(E0) - 1, px.y1); ctx.stroke(); glow(ctx, X(E0) - 1, px.y0, 5, C.red, pulse); ctx.globalAlpha = aK; pill(ctx, `Duane–Hunt limit = E₀ = ${E0.toFixed(1)} keV`, X(E0) - 6, px.y1 + 14, { color: C.red, size: 11, align: 'right', a: aD }); hs.push({ x: X(E0), y: (px.y0 + px.y1) / 2, r: 14, kind: 'brems', data: { E: E0, dh: true } }); }
+    ctx.restore();
+  }
+}
+
+function scene6(ctx, lt, T, P, hs, D) {
+  const { ph, spec, params } = P, E0 = ph.E0;
+  const sx0 = 40, sx1 = 300, sy = 170, spot = [170, sy];
+  ctx.fillStyle = '#18212d'; ctx.fillRect(sx0, sy, sx1 - sx0, 40); ctx.strokeStyle = 'rgba(150,190,230,0.55)'; ctx.beginPath(); ctx.moveTo(sx0, sy); ctx.lineTo(sx1, sy); ctx.stroke();
+  txt(ctx, ph.label, sx0, sy + 58, { size: 11, f: 'mono', color: C.muted });
+  const cg = ctx.createLinearGradient(0, 0, 0, sy); cg.addColorStop(0, hexA(C.cyan, 0.03)); cg.addColorStop(1, hexA(C.cyan, 0.3)); ctx.fillStyle = cg; ctx.beginPath(); ctx.moveTo(spot[0] - 10, 0); ctx.lineTo(spot[0] + 10, 0); ctx.lineTo(spot[0] + 1, sy); ctx.lineTo(spot[0] - 1, sy); ctx.closePath(); ctx.fill();
+  glow(ctx, spot[0], spot[1], 5, C.cyan, 0.8 + 0.2 * Math.sin(T * 10)); hs.push({ x: spot[0], y: spot[1] - 30, r: 12, kind: 'primary' });
+  // detector
+  const Fp = [470, 118], u = [Fp[0] - spot[0], Fp[1] - spot[1]], ul = Math.hypot(u[0], u[1]), ux = u[0] / ul, uy = u[1] / ul, nx = -uy, ny = ux;
+  const body = (s0, s1, w) => { ctx.beginPath(); ctx.moveTo(Fp[0] + ux * s0 + nx * w, Fp[1] + uy * s0 + ny * w); ctx.lineTo(Fp[0] + ux * s1 + nx * w, Fp[1] + uy * s1 + ny * w); ctx.lineTo(Fp[0] + ux * s1 - nx * w, Fp[1] + uy * s1 - ny * w); ctx.lineTo(Fp[0] + ux * s0 - nx * w, Fp[1] + uy * s0 - ny * w); ctx.closePath(); };
+  body(0, 26, 20); ctx.fillStyle = '#26303d'; ctx.fill(); body(26, 170, 27); ctx.fillStyle = '#1b2430'; ctx.fill(); ctx.strokeStyle = 'rgba(150,180,210,0.35)'; ctx.stroke();
+  body(-2, 2, 18); ctx.fillStyle = hexA(C.violet, 0.8); ctx.fill();
+  const lastHit = [];
+  txt(ctx, 'SDD · energy-dispersive detector', Fp[0] + 30, Fp[1] - 44, { size: 12, w: 600, color: C.text });
+  hs.push({ x: Fp[0] + ux * 80, y: Fp[1] + uy * 80, r: 34, kind: 'detector', tag: 'EDS detector' });
+  // spectrum geometry
+  const X0 = 60, X1 = 920, YT = 250, YB = 488, W = X1 - X0;
+  const X = E => X0 + (E / E0) * W;
+  const f = clamp(Math.pow(clamp((lt - 0.8) / (D * 0.62)), 1.9));
+  const logY = params.logY, ymax = spec.max * 1.12, Ymap = c => (logY ? YB - (Math.log10(1 + c) / Math.log10(1 + ymax * 1.4)) * (YB - YT) : YB - (c / ymax) * (YB - YT));
+  // photons in flight + channel drops
+  const dtE = clamp(0.16 / Math.sqrt(params.current), 0.07, 0.3), flight = ul / 420, drop = 0.6;
+  const iMax = Math.floor((lt - 0.3) / dtE), iMin = Math.max(0, Math.floor((lt - 0.3 - flight - drop) / dtE));
+  for (let i = iMin; i <= iMax; i++) {
+    const age = lt - (0.3 + i * dtE); if (age < 0) continue; const E = sampleE(spec, hash(i * 7.31 + 0.5)), col = photonColor(E), ln = lineNear(spec, E);
+    const src = ln ? `${ln.sym} ${ln.n}` : 'Bremsstrahlung continuum';
+    if (age < flight) { const ang = Math.atan2(uy, ux) + (hash(i * 3.3) - 0.5) * 0.12; const hd = photon(ctx, spot[0], spot[1], ang, age * 420, E, 0.95); hs.push({ x: hd[0], y: hd[1], r: 12, kind: 'xray', data: { E, src } }); }
+    else if (age < flight + drop) {
+      const v = (age - flight) / drop, a0 = [Fp[0] + ux * 40, Fp[1] + uy * 40 + 24], b0 = [X(E), YT - 6], c0 = [lerp(a0[0], b0[0], 0.5), a0[1] + 10];
+      const qx = (1 - v) * (1 - v) * a0[0] + 2 * (1 - v) * v * c0[0] + v * v * b0[0], qy = (1 - v) * (1 - v) * a0[1] + 2 * (1 - v) * v * c0[1] + v * v * b0[1];
+      glow(ctx, qx, qy, 2.6, col, 1 - seg(v, 0.8, 1)); if (v < 0.25) lastHit.push(1 - v / 0.25); hs.push({ x: qx, y: qy, r: 10, kind: 'xray', data: { E, src } });
+    }
+  }
+  if (lastHit.length) { ctx.save(); ctx.globalAlpha = Math.max(...lastHit) * 0.9; ctx.strokeStyle = C.violet; ctx.lineWidth = 2; ctx.beginPath(); ctx.arc(Fp[0], Fp[1], 26, 0, 7); ctx.stroke(); ctx.restore(); }
+  // spectrum frame
+  ctx.strokeStyle = 'rgba(160,185,210,0.3)'; ctx.lineWidth = 1; ctx.beginPath(); ctx.moveTo(X0, YT - 10); ctx.lineTo(X0, YB); ctx.lineTo(X1, YB); ctx.stroke();
+  const step = E0 <= 6 ? 1 : E0 <= 12 ? 2 : E0 <= 24 ? 4 : 5;
+  for (let e = 0; e <= E0 + 1e-6; e += step) { ctx.strokeStyle = 'rgba(160,185,210,0.08)'; ctx.beginPath(); ctx.moveTo(X(e), YT - 10); ctx.lineTo(X(e), YB); ctx.stroke(); txt(ctx, String(e), X(e), YB + 15, { size: 10.5, f: 'mono', color: C.faint, align: 'center' }); }
+  txt(ctx, 'photon energy (keV)', X1, YB + 30, { size: 10.5, f: 'mono', color: C.muted, align: 'right' });
+  txt(ctx, logY ? 'counts (log)' : 'counts', X0 + 6, YT - 14, { size: 10.5, f: 'mono', color: C.muted });
+  // histogram
+  let tot = 0; ctx.beginPath(); ctx.moveTo(X0, YB);
+  for (let i = 0; i < spec.n; i++) { const m = spec.mu[i] * f; const c = Math.max(0, m + Math.sqrt(m) * spec.noise[i] * 0.9); tot += c; const xa = X0 + (i / spec.n) * W, xb = X0 + ((i + 1) / spec.n) * W, y = Ymap(c); ctx.lineTo(xa, y); ctx.lineTo(xb, y); }
+  ctx.lineTo(X1, YB); ctx.closePath(); const hg = ctx.createLinearGradient(0, YT, 0, YB); hg.addColorStop(0, hexA(C.mag, 0.75)); hg.addColorStop(1, hexA(C.violet, 0.18)); ctx.fillStyle = hg; ctx.fill(); ctx.strokeStyle = hexA('#ffc2dc', 0.9); ctx.lineWidth = 1; ctx.stroke();
+  hs.push({ x: X(E0 * 0.72), y: YB - 12, r: 16, kind: 'brems', data: { E: E0 * 0.72 } });
+  pill(ctx, `${Math.round(tot).toLocaleString()} counts · live ${Math.max(0, lt - 0.8).toFixed(1)} s`, X1, YT - 16, { color: C.muted, size: 11, align: 'right' });
+  // peak labels
+  const aP = seg(lt, 16.5, 17.5), boxes = [];
+  spec.lines.filter(l => l.peak > spec.max * 0.02).slice(0, 9).forEach(l => {
+    const c = l.top * f, x = X(l.E); let y = Ymap(c) - 14; const label = `${l.sym} ${l.n}`; const w = label.length * 7.4 + 16;
+    for (let tries = 0; tries < 6; tries++) { const hit = boxes.some(b => Math.abs(b.x - x) < (b.w + w) / 2 && Math.abs(b.y - y) < 20); if (!hit) break; y -= 20; }
+    y = Math.max(YT - 30, y); boxes.push({ x, y, w });
+    if (aP > 0) { ctx.save(); ctx.globalAlpha = aP; ctx.strokeStyle = hexA(photonColor(l.E), 0.6); ctx.beginPath(); ctx.moveTo(x, y + 8); ctx.lineTo(x, Ymap(c) - 2); ctx.stroke(); ctx.restore(); pill(ctx, label, x, y, { color: photonColor(l.E), size: 11, align: 'center', a: aP }); }
+    hs.push({ x, y: Math.min(YB - 8, Ymap(c) + 8), r: 14, kind: 'peak', data: { line: l } });
+  });
+  // quantification panel
+  const aQ = seg(lt, 17, 18);
+  if (aQ > 0) {
+    const qx = 700, qy = 18, qh = 58 + ph.comp.length * 22; panel(ctx, qx, qy, 236, qh, aQ);
+    txt(ctx, 'QUANTIFICATION', qx + 14, qy + 20, { size: 10.5, w: 600, f: 'mono', color: C.muted, a: aQ });
+    txt(ctx, 'at%', qx + 150, qy + 20, { size: 10.5, f: 'mono', color: C.muted, align: 'right', a: aQ }); txt(ctx, 'wt%', qx + 218, qy + 20, { size: 10.5, f: 'mono', color: C.muted, align: 'right', a: aQ });
+    ph.comp.forEach((c, i) => { const y = qy + 42 + i * 22; txt(ctx, c.el.sym, qx + 14, y, { size: 13, w: 600, f: 'disp', color: C.text, a: aQ }); txt(ctx, (c.x * 100).toFixed(1), qx + 150, y, { size: 12.5, f: 'mono', color: C.text, align: 'right', a: aQ }); txt(ctx, (c.w * 100).toFixed(1), qx + 218, y, { size: 12.5, f: 'mono', color: C.text, align: 'right', a: aQ }); });
+    txt(ctx, 'typical EDS uncertainty ±0.1–0.5 %', qx + 14, qy + qh - 10, { size: 10, f: 'mono', color: C.faint, a: aQ });
+  }
+  // FWHM bracket
+  const aF = seg(lt, 23, 24) * (1 - seg(lt, 29.5, 30.5));
+  if (aF > 0 && spec.lines.length) {
+    const l = spec.lines[0], c = l.top * f, hm = Ymap(l.peak * f * 0.5 + (l.top - l.peak) * f), xa = X(l.E - l.fw / 2), xb = X(l.E + l.fw / 2);
+    ctx.save(); ctx.globalAlpha = aF; ctx.strokeStyle = C.cyan; ctx.lineWidth = 1.5; ctx.beginPath(); ctx.moveTo(xa, hm - 5); ctx.lineTo(xa, hm + 5); ctx.moveTo(xa, hm); ctx.lineTo(xb, hm); ctx.moveTo(xb, hm - 5); ctx.lineTo(xb, hm + 5); ctx.stroke(); ctx.restore();
+    pill(ctx, `FWHM ${Math.round(l.fw * 1000)} eV @ ${l.sym} ${l.n}`, xb + 10, hm, { color: C.cyan, size: 11, a: aF, align: xb > 700 ? 'right' : 'left' });
+    txt(ctx, `detector resolution ${params.res} eV at Mn Kα (5.9 keV)`, X0 + 10, YT + 8, { size: 11, f: 'mono', color: C.cyan, a: aF });
+  }
+  // absorption edges & overvoltage
+  const aG = seg(lt, 30, 31);
+  if (aG > 0) {
+    const off = []; let row = 0;
+    ph.comp.forEach(c => c.el.levels.forEach(([nm, Ec], sh) => {
+      if (!c.el.lines.some(l => l.sh === sh)) return;
+      if (Ec < E0) { const x = X(Ec), U = E0 / Ec; ctx.save(); ctx.globalAlpha = aG; ctx.strokeStyle = hexA(C.se, 0.7); ctx.setLineDash([4, 4]); ctx.beginPath(); ctx.moveTo(x, YT); ctx.lineTo(x, YB); ctx.stroke(); ctx.setLineDash([]); ctx.restore(); pill(ctx, `${c.el.sym} ${nm} edge · U ${U.toFixed(1)}`, x + 4, YB - 14 - (row++ % 3) * 20, { color: C.se, size: 10.5, a: aG }); hs.push({ x, y: YB - 40, r: 10, kind: 'edge', data: { el: c.el, sh, Ec, U } }); }
+      else off.push(`${c.el.sym} ${nm} ${fmtE(Ec)}`);
+    }));
+    if (off.length) pill(ctx, `edges above E₀ (lines off): ${off.join(' · ')}`, X0 + 10, YT + 28, { color: C.amber, size: 10.5, a: aG, f: 'mono' });
+  }
+}
+
+const SCENES = [scene1, scene2, scene3, scene4, scene5, scene6];
+
+function drawFrame(ctx, t, P, mouse) {
+  const hs = [];
+  ctx.fillStyle = '#05070a'; ctx.fillRect(0, 0, 960, 540);
+  ctx.strokeStyle = 'rgba(110,150,200,0.045)'; ctx.lineWidth = 1; ctx.beginPath();
+  for (let x = 0; x <= 960; x += 40) { ctx.moveTo(x + 0.5, 0); ctx.lineTo(x + 0.5, 540); } for (let y = 0; y <= 540; y += 40) { ctx.moveTo(0, y + 0.5); ctx.lineTo(960, y + 0.5); } ctx.stroke();
+  const loc = locate(t), ch = CHAPTERS[loc.ci];
+  ctx.save(); try { SCENES[loc.ci](ctx, loc.lt, t, P, hs, ch.dur); } catch (e) { console.error(e); } ctx.restore();
+  // vignette
+  const vg = ctx.createRadialGradient(480, 270, 260, 480, 270, 620); vg.addColorStop(0, 'rgba(0,0,0,0)'); vg.addColorStop(1, 'rgba(0,0,0,0.45)'); ctx.fillStyle = vg; ctx.fillRect(0, 0, 960, 540);
+  // HUD
+  txt(ctx, `${ph_hud(P)}`, 944, 530, { size: 10.5, f: 'mono', color: C.faint, align: 'right' });
+  // concept tags
+  if (P.tags) hs.forEach(h => { if (h.tag) pill(ctx, h.tag, h.x + (h.r || 8) + 6, h.y - (h.r || 8) - 4, { color: C.text, size: 10.5, f: 'sans', w: 500, bg: 'rgba(6,9,14,0.72)' }); });
+  // hover ring
+  if (mouse) { const h = hitTest(hs, mouse[0], mouse[1]); if (h) { ctx.save(); ctx.strokeStyle = '#ffffff'; ctx.globalAlpha = 0.85; ctx.lineWidth = 1.5; ctx.setLineDash([3, 3]); ctx.beginPath(); ctx.arc(h.x, h.y, Math.min(40, (h.r || 8) + 5), 0, 7); ctx.stroke(); ctx.restore(); } }
+  // chapter transition fade
+  const fi = 1 - seg(loc.lt, 0, 0.45); if (fi > 0 && t > 0.05) { ctx.fillStyle = `rgba(5,7,10,${fi * 0.85})`; ctx.fillRect(0, 0, 960, 540); }
+  return hs;
+}
+const ph_hud = P => `E₀ ${P.ph.E0.toFixed(1)} kV · ${P.ph.label}`;
+function hitTest(hs, x, y) { let best = null, bd = 1e9; for (let i = hs.length - 1; i >= 0; i--) { const h = hs[i], d = Math.hypot(h.x - x, h.y - y), r = (h.r || 8) + 4; if (d <= r) { const score = d + r * 0.5; if (score < bd) { bd = score; best = h; } } } return best; }
+
+/* =====================================================================
+   7 · MICRO-CONCEPT CARDS
+   ===================================================================== */
+function infoFor(h, ph, spec, params) {
+  const E0 = ph.E0, d = h.data || {};
+  switch (h.kind) {
+    case 'primary': return { color: C.cyan, title: 'Primary (beam) electron', body: `Accelerated through ${E0.toFixed(1)} kV in the gun. Its energy sets how deep the interaction volume reaches and which shells it can ionize: a shell is reachable only when the overvoltage U = E₀/E_c exceeds 1.${d.after ? ' This one has already given up at least the binding energy of the shell it ionized.' : ''}`, formula: 'λ = h / √(2m₀eV · (1 + eV / 2m₀c²))', stats: [['Energy E₀', `${E0.toFixed(1)} keV`], ['Speed v', `${ph.beta.toFixed(3)} c`], ['Wavelength λ', `${ph.lambda.toFixed(2)} pm`], ['Lorentz γ', ph.gamma.toFixed(4)]] };
+    case 'volume': return { color: C.cyan, title: 'Interaction volume', body: 'The region where beam electrons scatter until they run out of energy, simulated here by Monte Carlo trajectories. It grows with E₀ and shrinks with Z: low-Z specimens give a teardrop, high-Z specimens a shallow hemisphere.', formula: 'R = 0.0276 · A · E₀^1.67 / (Z^0.89 · ρ)   [µm]', stats: [['Range R (K–O)', fmtLen(ph.R)], ['X-ray range Rₓ', fmtLen(ph.Rx)], ['Mean Z̄', ph.Zbar.toFixed(1)], ['Density ρ', `${ph.rho.toFixed(2)} g/cm³`]] };
+    case 'se': return { color: C.se, title: 'Secondary electron (SE)', body: 'A loosely bound outer-shell electron knocked out by inelastic scattering. With under 50 eV it escapes only from the top few nanometers, which is why SE images show topographic contrast.', formula: 'E_SE < 50 eV  (most ≈ 2–5 eV)', stats: [['Escape depth', '≈ 5–50 nm'], ['Contrast', 'topography'], ['Scattering', 'inelastic']] };
+    case 'bse': return { color: C.amber, title: 'Backscattered electron (BSE)', body: 'A beam electron turned back by elastic (Rutherford) scattering off a nucleus, keeping most of its energy. Heavier atoms scatter more strongly, so BSE images show Z-contrast: Ti appears brighter than Si.', formula: 'σ_R ∝ Z² / E²', stats: [['Backscatter η(Z̄)', ph.eta.toFixed(3)], ['Mean Z̄', ph.Zbar.toFixed(1)], ['Scattering', 'elastic'], ['Energy', `≲ ${E0.toFixed(1)} keV`]] };
+    case 'xray': { const E = d.E; return { color: photonColor(E), title: 'X-ray photon', body: `Origin: ${d.src}. A characteristic photon carries exactly the energy gap between two shells, so its energy identifies the element that emitted it.`, formula: `λ = 1.2398 / E  →  ${(1.2398 / E).toFixed(4)} nm`, stats: [['Energy', fmtE(E)], ['Wavelength', `${(1239.8 / E).toFixed(1)} pm`], ['Frequency', `${(E * 2.418e17 / 1e18).toFixed(2)} × 10¹⁸ Hz`]] }; }
+    case 'bound': { const el = d.el, Ec = el.levels[d.i][1], U = E0 / Ec; return { color: C.bound, title: `${SHELL[d.i]}-shell electron · ${el.name}`, body: `Bound with ${fmtE(Ec)}. ${U > 1 ? `At ${E0} kV the overvoltage is ${U.toFixed(2)}, so the beam can eject it.` : `At ${E0} kV the beam cannot reach it (U < 1); raise E₀ above ${fmtE(Ec)}.`}`, formula: 'U = E₀ / E_c   (ionization requires U > 1)', stats: [['Binding energy', fmtE(Ec)], ['Overvoltage U', U.toFixed(2)], ['Ionizable?', U > 1 ? 'yes' : 'no']] }; }
+    case 'ejected': { const el = d.el, Ec = el.levels[d.i][1]; return { color: C.bound, title: `Ejected ${SHELL[d.i]} electron`, body: 'Knocked clean out of the atom. The primary paid at least its binding energy to free it; any extra energy leaves as the ejected electron’s kinetic energy.', formula: 'E_kin = ΔE − E_c', stats: [['Binding energy', fmtE(Ec)], ['Primary loses', `≥ ${fmtE(Ec)}`]] }; }
+    case 'hole': { const el = d.el, w = omega(el.Z, d.i); return { color: C.red, title: `Core hole · ${SHELL[d.i]} shell`, body: 'A vacancy in an inner shell. It lives for roughly 10⁻¹⁵ s before an outer electron fills it. The released energy leaves either as a characteristic X-ray (probability ω) or as an Auger electron (1 − ω).', formula: 'ω_K ≈ Z⁴ / (Z⁴ + 1.12 × 10⁶)', stats: [['Fluorescence ω', w < 0.01 ? w.toFixed(4) : w.toFixed(3)], ['Auger 1 − ω', (1 - w).toFixed(3)], ['Element', `${el.sym} (Z = ${el.Z})`]] }; }
+    case 'nucleus': { const el = d.el; return { color: '#ff9a5c', title: `Nucleus · ${el.name}`, body: 'Positive charge +Ze. Its Coulomb field deflects passing electrons: elastic deflection gives backscattered electrons (and HAADF contrast in STEM), and deceleration gives Bremsstrahlung.', formula: 'Rutherford: σ ∝ Z² / E²', stats: [['Atomic number Z', el.Z], ['Atomic mass A', el.A.toFixed(2)], ['Density ρ', `${el.rho} g/cm³`]] }; }
+    case 'level': { const el = d.el, Ec = el.levels[d.i][1]; return { color: C.bound, title: `${SHELL[d.i]} energy level`, body: `The energy needed to lift a ${SHELL[d.i]} electron to the vacuum. Differences between levels set the characteristic line energies.`, formula: 'E(line) = E_c(inner) − E_c(outer)', stats: [['Binding energy', fmtE(Ec)], ['Reachable at E₀?', E0 > Ec ? 'yes' : 'no']] }; }
+    case 'auger': return { color: C.auger, title: `Auger electron (${d.nm})`, body: 'Emitted when the relaxation energy is handed to another outer electron instead of leaving as a photon. Its energy is characteristic, but it escapes only from the top few nanometers, so Auger spectroscopy is a surface technique.', formula: 'E_KLL ≈ E_K − E_L − E_L′', stats: [['Energy', fmtE(d.E)], ['Escape depth', '≈ 0.5–3 nm']] };
+    case 'brems': return { color: C.amber, title: d.dh ? 'Duane–Hunt limit' : 'Bremsstrahlung (continuum)', body: d.dh ? 'An electron can radiate at most all of its kinetic energy in one event, so the continuum ends exactly at E₀. Reading this cut-off checks the true accelerating voltage.' : 'Braking radiation from electrons decelerated in the nuclear field. Any energy from 0 to E₀ is possible, giving the smooth background under every EDS spectrum.', formula: 'Kramers: I(E) ∝ Z · (E₀ − E) / E', stats: [['Photon energy', fmtE(d.E)], ['Fraction of E₀', `${((d.E / E0) * 100).toFixed(0)} %`], ['Mean Z̄', ph.Zbar.toFixed(1)]] };
+    case 'detector': { const l = spec.lines[0]; return { color: C.violet, title: 'Silicon drift detector (EDS)', body: 'Each X-ray makes electron–hole pairs in silicon (≈ 3.8 eV per pair). The collected charge is proportional to photon energy, so every pulse is sorted into an energy channel. Statistics broaden each line into a Gaussian peak.', formula: 'FWHM(E)² = FWHM_Mn² + 2.49 eV · (E − 5895 eV)', stats: [['Resolution @ Mn Kα', `${params.res} eV`], ...(l ? [[`FWHM @ ${l.sym} ${l.n}`, `${Math.round(l.fw * 1000)} eV`]] : []), ['e–h pairs for 8 keV', '≈ 2100']] }; }
+    case 'peak': { const l = d.line; return { color: photonColor(l.E), title: `${l.sym} ${l.n} peak`, body: `Produced when a ${SHELL[l.sh]}-shell vacancy is filled from the ${SHELL[l.from]} shell. Its position identifies ${l.el.name}; its area (after ZAF correction) measures how much is present.`, formula: `E(${l.n}) = E_${SHELL[l.sh]} − E_${SHELL[l.from]}`, stats: [['Line energy', fmtE(l.E)], [`${SHELL[l.sh]} edge`, fmtE(l.edge)], ['Overvoltage U', l.U.toFixed(2)], ['FWHM', `${Math.round(l.fw * 1000)} eV`], ['Relative weight', l.rel.toFixed(2)]] }; }
+    case 'edge': return { color: C.se, title: `${d.el.sym} ${SHELL[d.sh]} absorption edge`, body: 'The minimum energy needed to create a vacancy in this shell. Its lines appear only once E₀ passes the edge, and for efficient excitation you want U ≈ 2 or more.', formula: 'U = E₀ / E_c', stats: [['Edge energy', fmtE(d.Ec)], ['Overvoltage U', d.U.toFixed(2)]] };
+    case 'eels': return { color: C.red, title: `EELS ${d.sh} ionization edge`, body: 'In the TEM an electron spectrometer measures how much energy each transmitted electron lost. Ionizing a shell costs at least its binding energy, so an edge appears at that loss. EELS works best for light elements and can reach ppm sensitivity.', formula: 'E_loss ≥ E_c', stats: [['Edge onset', fmtE(d.Ek)]] };
+    default: return { color: C.text, title: 'Concept', body: '', stats: [] };
+  }
+}
+
+/* =====================================================================
+   8 · UI COMPONENTS
+   ===================================================================== */
+function Icon({ name, size = 18, className = '', sw = 2 }) {
+  const L = window.lucide; let node = L && L.icons && L.icons[name];
+  if (!node) return <span aria-hidden="true" style={{ width: size, height: size, display: 'inline-block' }} />;
+  const kids = node[0] === 'svg' ? node[2] || [] : node;
+  const camel = o => { const r = {}; Object.keys(o || {}).forEach(k => { r[k.replace(/-([a-z])/g, (_, c) => c.toUpperCase())] = o[k]; }); return r; };
+  return (<svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={sw} strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+    {kids.map((k, i) => React.createElement(k[0], { key: i, ...camel(k[1]) }))}
+  </svg>);
+}
+
+function Caption({ sent, sp }) {
+  const toks = useMemo(() => { const out = []; let em = false; sent.text.split(' ').forEach(w => { let e = em; if (w.startsWith('*')) { e = true; em = true; } const clean = w.replace(/\*/g, ''); if (w.replace(/[.,:;!?)]+$/, '').endsWith('*')) em = false; out.push({ w: clean, em: e }); }); return out; }, [sent]);
+  const total = toks.reduce((s, t) => s + t.w.length + 1, 0); let acc = 0; const pos = sp * total * 1.08;
+  return (<div className="cap" key={sent.gi}>{toks.map((t, i) => { const st = acc; acc += t.w.length + 1; const on = pos >= st, now = on && pos < acc; return <span key={i} className={`w${t.em ? ' em' : ''}${on ? ' on' : ''}${now ? ' now' : ''}`}>{t.w}{' '}</span>; })}</div>);
+}
+
+function Stage({ t, P, tags, onHot, children }) {
+  const wrap = useRef(null), cvs = useRef(null), hsRef = useRef([]), mouse = useRef(null);
+  const [, setTick] = useState(0); const [tip, setTip] = useState(null);
+  useEffect(() => { const el = wrap.current; const fit = () => { const r = el.getBoundingClientRect(); const dpr = Math.min(2, window.devicePixelRatio || 1); const c = cvs.current; const w = Math.max(1, Math.round(r.width * dpr)), h = Math.max(1, Math.round(r.height * dpr)); if (c.width !== w || c.height !== h) { c.width = w; c.height = h; setTick(x => x + 1); } };
+    fit(); let ro; try { ro = new ResizeObserver(fit); ro.observe(el); } catch (e) { window.addEventListener('resize', fit); } return () => { ro ? ro.disconnect() : window.removeEventListener('resize', fit); }; }, []);
+  useEffect(() => { const c = cvs.current; if (!c) return; const ctx = c.getContext('2d'); const k = c.width / 960; ctx.setTransform(k, 0, 0, c.height / 540, 0, 0); hsRef.current = drawFrame(ctx, t, { ...P, tags }, mouse.current); });
+  const toLogical = e => { const r = cvs.current.getBoundingClientRect(); return [((e.clientX - r.left) / r.width) * 960, ((e.clientY - r.top) / r.height) * 540, e.clientX - r.left, e.clientY - r.top]; };
+  const onMove = e => { const [x, y, cx, cy] = toLogical(e); mouse.current = [x, y]; const h = hitTest(hsRef.current, x, y); cvs.current.style.cursor = h ? 'pointer' : 'default'; setTip(h ? { x: cx, y: cy, label: infoFor(h, P.ph, P.spec, P.params).title, color: infoFor(h, P.ph, P.spec, P.params).color } : null); if (!h) setTick(v => v + 1); };
+  const onLeave = () => { mouse.current = null; setTip(null); };
+  const onClick = e => { const [x, y] = toLogical(e); const h = hitTest(hsRef.current, x, y); if (h) onHot(h); };
+  return (<div ref={wrap} className="stage">
+    <canvas ref={cvs} onMouseMove={onMove} onMouseLeave={onLeave} onClick={onClick} role="img" aria-label="Animated visualization of electron–specimen interactions. Click moving particles or labeled objects for definitions." />
+    {tip && <div className="tip" style={{ left: tip.x, top: tip.y }}><b style={{ color: tip.color }}>{tip.label}</b> <span style={{ color: 'var(--muted)' }}>· click for details</span></div>}
+    {children}
+  </div>);
+}
+
+function InfoCard({ h, P, onClose }) {
+  const I = infoFor(h, P.ph, P.spec, P.params);
+  return (<div className="info" role="dialog" aria-label={I.title}>
+    <div className="flex items-start justify-between gap-3">
+      <div><div className="eyebrow" style={{ color: I.color }}>Frame paused · micro-concept</div><h3 style={{ marginTop: 3 }}>{I.title}</h3></div>
+      <button className="ibtn" onClick={onClose} aria-label="Close and resume"><Icon name="X" size={16} /></button>
+    </div>
+    <p className="body">{I.body}</p>
+    {I.formula && <div className="formula">{I.formula}</div>}
+    {I.stats && I.stats.length > 0 && <dl>{I.stats.map(([k, v]) => <React.Fragment key={k}><dt>{k}</dt><dd>{v}</dd></React.Fragment>)}</dl>}
+    <button className="chip mt-3" onClick={onClose} style={{ color: I.color }}><Icon name="Play" size={13} /> Resume</button>
+  </div>);
+}
+
+function Timeline({ t, onSeek }) {
+  const track = useRef(null), drag = useRef(false); const [hov, setHov] = useState(null);
+  const posT = e => { const r = track.current.getBoundingClientRect(); return clamp((e.clientX - r.left) / r.width) * TOTAL; };
+  const pct = x => `${(x / TOTAL) * 100}%`;
+  const hl = hov != null ? locate(hov) : null;
+  return (<div className="tl-wrap" role="slider" tabIndex={0} aria-label="Seek video" aria-valuemin={0} aria-valuemax={Math.round(TOTAL)} aria-valuenow={Math.round(t)} aria-valuetext={fmtTime(t)}
+    onKeyDown={e => { if (e.key === 'ArrowRight') { e.preventDefault(); e.stopPropagation(); onSeek(t + 5); } if (e.key === 'ArrowLeft') { e.preventDefault(); e.stopPropagation(); onSeek(t - 5); } }}
+    onPointerDown={e => { drag.current = true; try { e.currentTarget.setPointerCapture(e.pointerId); } catch (_) {} onSeek(posT(e)); }}
+    onPointerMove={e => { const v = posT(e); setHov(v); if (drag.current) onSeek(v); }}
+    onPointerUp={() => { drag.current = false; }} onPointerCancel={() => { drag.current = false; }} onPointerLeave={() => { if (!drag.current) setHov(null); }}>
+    <div ref={track} className="tl-track">
+      {CHAPTERS.map((c, i) => { const w = c.dur, fill = clamp((t - c.start) / w); return (<div key={i} className="tl-seg" style={{ left: `calc(${pct(c.start)} + ${i ? 2 : 0}px)`, width: `calc(${pct(w)} - ${i ? 2 : 0}px)` }}><div className="tl-fill" style={{ width: `${fill * 100}%`, background: c.color }} /></div>); })}
+      {SENTS.filter(s => s.si > 0).map(s => <div key={s.gi} className="tl-tick" style={{ left: pct(s.start) }} />)}
+      <div className="tl-thumb" style={{ left: pct(t) }} />
+    </div>
+    {hl && <div className="tl-tip" style={{ left: pct(hov) }}><span className="mono" style={{ color: CHAPTERS[hl.ci].color }}>{fmtTime(hov)}</span> · {CHAPTERS[hl.ci].short}<div style={{ color: 'var(--muted)', maxWidth: 260, whiteSpace: 'normal', fontSize: 11.5 }}>{plain(SENTS[hl.gi].text).slice(0, 70)}…</div></div>}
+  </div>);
+}
+
+function Waveform({ active, t }) {
+  const bars = 22;
+  return (<div className="wave hide-sm" aria-hidden="true">{Array.from({ length: bars }, (_, i) => { const h = active ? 4 + 16 * Math.abs(Math.sin(t * (5 + (i % 5)) + i * 1.7)) * (0.4 + 0.6 * hash(i + Math.floor(t * 6))) : 3; return <i key={i} style={{ height: h }} />; })}</div>);
+}
+
+function ScriptPanel({ loc, t, onJump, follow, setFollow }) {
+  const box = useRef(null), refs = useRef({});
+  useEffect(() => { if (!follow) return; const c = box.current, el = refs.current[loc.gi]; if (!c || !el) return; const top = el.offsetTop - c.clientHeight * 0.3; c.scrollTo({ top, behavior: 'smooth' }); }, [loc.gi, follow]);
+  return (<section className="card flex flex-col" style={{ minHeight: 0 }} aria-label="Narration script">
+    <div className="card-h"><h2><Icon name="ScrollText" size={16} /> Narration script</h2>
+      <label className="toggle"><input type="checkbox" checked={follow} onChange={e => setFollow(e.target.checked)} id="follow" /> Follow</label></div>
+    <div ref={box} className="script" style={{ maxHeight: 'min(72vh, 760px)' }}>
+      {CHAPTERS.map((c, ci) => (<div key={ci}>
+        <div className="ch-head"><span className="num">CH {ci + 1}</span><span className="nm" style={{ color: loc.ci === ci ? c.color : 'var(--text)' }}>{c.title}</span><span className="tm">{fmtTime(c.start)}</span></div>
+        {c.sents.map(s => { const act = s.gi === loc.gi, past = s.gi < loc.gi; return (
+          <button key={s.gi} ref={el => (refs.current[s.gi] = el)} className={`sent${act ? ' active' : ''}${past ? ' past' : ''}`} style={{ borderLeftColor: act ? c.color : 'transparent' }} onClick={() => onJump(s.start + 0.01)} aria-current={act ? 'true' : undefined}>
+            <span className="ts">{fmtTime(s.start)}</span>
+            <span>{s.text.split(/(\*[^*]+\*)/g).map((p, i) => p.startsWith('*') ? <em key={i}>{p.slice(1, -1)}</em> : <React.Fragment key={i}>{p}</React.Fragment>)}</span>
+            {act && <span className="prog" style={{ width: `${loc.sp * 100}%`, color: c.color }} />}
+          </button>); })}
+      </div>))}
+      <p style={{ padding: '10px 14px 16px', color: 'var(--faint)', fontSize: 11.5 }}>Adapted from the MET_ENG 5520 Electron Microscopy lecture transcripts (SP2021): Complete SEM, Complete TEM, Beam–Specimen Interactions, Interaction Volume.</p>
+    </div>
+  </section>);
+}
+
+function Slider({ id, label, value, min, max, step, onChange, fmt, ticks, acc }) {
+  const p = ((value - min) / (max - min)) * 100;
+  return (<div className="ctl"><label htmlFor={id}><span>{label}</span><span className="val">{fmt ? fmt(value) : value}</span></label>
+    <input id={id} type="range" min={min} max={max} step={step} value={value} onChange={e => onChange(parseFloat(e.target.value))} style={{ '--p': `${p}%`, '--acc': acc || 'var(--cyan)' }} />
+    {ticks && <div className="ticks">{ticks.map(tk => <span key={tk}>{tk}</span>)}</div>}</div>);
+}
+
+const PRESETS = [
+  { name: 'Cu at 20 kV', hint: 'the lecture spectrum', p: { el: 'Cu', el2: 'none', E0: 20, res: 130 } },
+  { name: 'Ti + Si particles', hint: 'Z-contrast example', p: { el: 'Ti', el2: 'Si', x2: 50, E0: 15, res: 130 } },
+  { name: 'Au: M lines only', hint: 'raise E₀ past 11.9 keV', p: { el: 'Au', el2: 'none', E0: 10, res: 130 } },
+  { name: 'Low-kV carbon', hint: 'shallow volume', p: { el: 'C', el2: 'none', E0: 5, res: 130 } },
+  { name: 'Al/Si overlap', hint: 'poor resolution', p: { el: 'Al', el2: 'Si', x2: 40, E0: 15, res: 190 } },
+];
+
+function LabPanel({ params, set, ph, spec, onReset }) {
+  const upd = (k, v) => set(p => ({ ...p, [k]: v }));
+  const W = 320, H = 96;
+  const path = useMemo(() => { let d = `M0 ${H}`; const mx = spec.max * 1.12; for (let i = 0; i < spec.n; i++) { const x = (i / spec.n) * W, y = H - (spec.mu[i] / mx) * (H - 6); d += ` L${x.toFixed(1)} ${y.toFixed(1)}`; } return d + ` L${W} ${H} Z`; }, [spec]);
+  const edges = []; ph.comp.forEach(c => c.el.levels.forEach(([nm, Ec], sh) => { if (c.el.lines.some(l => l.sh === sh)) edges.push({ el: c.el, nm, Ec, U: ph.E0 / Ec }); }));
+  return (<section className="card" aria-label="Lab controls">
+    <div className="card-h"><h2><Icon name="FlaskConical" size={16} /> Lab mode <span className="eyebrow" style={{ fontSize: 10 }}>changes apply to every frame, live</span></h2>
+      <button className="chip" onClick={onReset}><Icon name="RotateCcw" size={13} /> Reset</button></div>
+    <div className="flex flex-wrap gap-2" style={{ padding: '12px 14px 0' }}>
+      {PRESETS.map(pr => <button key={pr.name} className="chip" onClick={() => set(p => ({ ...p, ...pr.p }))} title={pr.hint}><Icon name="Sparkles" size={12} /> {pr.name} <span style={{ color: 'var(--faint)' }}>· {pr.hint}</span></button>)}
+    </div>
+    <div className="lab-grid">
+      <div className="flex flex-col gap-4">
+        <Slider id="e0" label="Beam energy E₀ (accelerating voltage)" value={params.E0} min={5} max={30} step={0.5} onChange={v => upd('E0', v)} fmt={v => `${v.toFixed(1)} kV`} ticks={['5', '10', '15', '20', '25', '30 kV']} />
+        <dl className="readout">
+          <dt>Electron speed</dt><dd>{ph.beta.toFixed(3)} c</dd>
+          <dt>Wavelength λ</dt><dd>{ph.lambda.toFixed(2)} pm</dd>
+          <dt>Interaction range R</dt><dd>{fmtLen(ph.R)}</dd>
+          <dt>X-ray range Rₓ</dt><dd>{fmtLen(ph.Rx)}</dd>
+          <dt>Backscatter η</dt><dd>{ph.eta.toFixed(3)}</dd>
+        </dl>
+      </div>
+      <div className="flex flex-col gap-3">
+        <div className="ctl"><span className="lbl"><span>Specimen element</span><span className="val">{ph.el.name}</span></span>
+          <div className="grid gap-1.5" style={{ gridTemplateColumns: 'repeat(8, minmax(0,1fr))' }}>
+            {EL_ORDER.map(s => <button key={s} className={`elbtn${params.el === s ? ' on' : ''}`} onClick={() => set(p => ({ ...p, el: s, el2: p.el2 === s ? 'none' : p.el2 }))} aria-pressed={params.el === s} aria-label={`${ELEMENTS[s].name}, Z ${ELEMENTS[s].Z}`}><span className="z">{ELEMENTS[s].Z}</span><span className="s">{s}</span></button>)}
+          </div></div>
+        <div className="grid grid-cols-2 gap-3">
+          <div className="ctl"><label htmlFor="el2"><span>Second element</span></label>
+            <select id="el2" value={params.el2} onChange={e => upd('el2', e.target.value)}><option value="none">None</option>{EL_ORDER.filter(s => s !== params.el).map(s => <option key={s} value={s}>{ELEMENTS[s].name} ({s})</option>)}</select></div>
+          <div style={{ opacity: params.el2 === 'none' ? 0.4 : 1 }}><Slider id="x2" label="Amount" value={params.x2} min={5} max={60} step={1} onChange={v => upd('x2', v)} fmt={v => `${v} at%`} acc="var(--violet)" /></div>
+        </div>
+        <div>
+          <div className="eyebrow" style={{ fontSize: 10, marginBottom: 4 }}>Absorption edges vs E₀</div>
+          {edges.map((e, i) => { const on = e.U > 1; return (<div key={i} className="edge"><span className="dot" style={{ background: on ? 'var(--se)' : 'var(--amber)' }} /><span className="disp" style={{ fontWeight: 600, width: 54 }}>{e.el.sym} {e.nm}</span><span className="mono" style={{ color: 'var(--muted)' }}>{fmtE(e.Ec)}</span><span className="mono" style={{ marginLeft: 'auto', color: on ? 'var(--se)' : 'var(--amber)' }}>{on ? `U ${e.U.toFixed(2)} · lines on` : 'U < 1 · off'}</span></div>); })}
+        </div>
+      </div>
+      <div className="flex flex-col gap-4">
+        <Slider id="res" label="Detector resolution (FWHM @ Mn Kα)" value={params.res} min={60} max={220} step={5} onChange={v => upd('res', v)} fmt={v => `${v} eV`} ticks={['60', 'SDD 125', 'Si(Li) 150', '220 eV']} acc="var(--mag)" />
+        <Slider id="cur" label="Probe current (count rate)" value={params.current} min={0.25} max={3} step={0.25} onChange={v => upd('current', v)} fmt={v => `${v.toFixed(2)} nA`} acc="var(--amber)" />
+        <div>
+          <div className="flex items-center justify-between"><span className="eyebrow" style={{ fontSize: 10 }}>Live spectrum preview · 0–{ph.E0} keV</span><label className="toggle"><input id="logy" type="checkbox" checked={params.logY} onChange={e => upd('logY', e.target.checked)} /> Log counts</label></div>
+          <svg viewBox={`0 0 ${W} ${H + 14}`} width="100%" style={{ display: 'block', marginTop: 6 }} role="img" aria-label="Expected EDS spectrum for current settings">
+            <defs><linearGradient id="sg" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stopColor="#ff5fa2" stopOpacity=".8" /><stop offset="1" stopColor="#b69cff" stopOpacity=".15" /></linearGradient></defs>
+            <rect x="0" y="0" width={W} height={H} fill="#080b10" rx="4" />
+            <path d={path} fill="url(#sg)" stroke="#ffc2dc" strokeWidth=".8" />
+            {spec.lines.slice(0, 5).map((l, i) => <text key={i} x={clamp((l.E / ph.E0) * W, 10, W - 10)} y={Math.max(10, H - (l.top / (spec.max * 1.12)) * (H - 6) - 4)} fill={photonColor(l.E)} fontSize="8.5" fontFamily="IBM Plex Mono, monospace" textAnchor="middle">{l.sym} {l.n}</text>)}
+            <text x="0" y={H + 11} fill="#56667a" fontSize="8" fontFamily="IBM Plex Mono, monospace">0</text>
+            <text x={W} y={H + 11} fill="#56667a" fontSize="8" fontFamily="IBM Plex Mono, monospace" textAnchor="end">{ph.E0} keV</text>
+          </svg>
+        </div>
+      </div>
+    </div>
+  </section>);
+}
+
+/* =====================================================================
+   9 · APP
+   ===================================================================== */
+const DEFAULTS = { E0: 20, el: 'Cu', el2: 'none', x2: 20, res: 130, current: 1, logY: false };
+const SPEEDS = [0.5, 0.75, 1, 1.25, 1.5, 2];
+
+function App() {
+  const [t, setT] = useState(0); const tRef = useRef(0);
+  const [playing, setPlaying] = useState(false); const [started, setStarted] = useState(false);
+  const [speed, setSpeed] = useState(() => { const s = store.get('speed', 1); return SPEEDS.includes(s) ? s : 1; }); const speedRef = useRef(speed); speedRef.current = speed;
+  const [cc, setCc] = useState(() => store.get('cc', true)); const [tags, setTags] = useState(() => store.get('tags', true));
+  const [tts, setTts] = useState(false); const ttsOK = typeof window !== 'undefined' && 'speechSynthesis' in window && typeof window.SpeechSynthesisUtterance === 'function';
+  const [params, setParams] = useState(DEFAULTS); const [info, setInfo] = useState(null); const autoPaused = useRef(false);
+  const [follow, setFollow] = useState(true); const [speedMenu, setSpeedMenu] = useState(false); const [fs, setFs] = useState(false);
+  const playerRef = useRef(null);
+  const ph = useMemo(() => physics(params), [params]);
+  const spec = useMemo(() => buildSpectrum(ph, params.res, params.current), [ph, params.res, params.current]);
+  const P = useMemo(() => ({ ph, spec, params }), [ph, spec, params]);
+  const loc = locate(t), ended = t >= TOTAL - 0.001;
+
+  useEffect(() => store.set('speed', speed), [speed]); useEffect(() => store.set('cc', cc), [cc]); useEffect(() => store.set('tags', tags), [tags]);
+  const seek = useCallback(nt => { const v = clamp(nt, 0, TOTAL); tRef.current = v; setT(v); if (v > 0) setStarted(true); }, []);
+  const play = useCallback(() => { if (tRef.current >= TOTAL - 0.01) seek(0); setStarted(true); setInfo(null); autoPaused.current = false; setPlaying(true); }, [seek]);
+  const pause = useCallback(() => setPlaying(false), []);
+  const toggleRef = useRef(); toggleRef.current = () => (playing ? pause() : play());
+  const jumpCh = d => { const ci = clamp(loc.ci + d, 0, CHAPTERS.length - 1); const back = d < 0 && loc.lt > 2 ? loc.ci : ci; seek(CHAPTERS[back].start + 0.01); };
+  const jumpRef = useRef(); jumpRef.current = jumpCh;
+
+  useEffect(() => { if (!playing) return; let raf, last = performance.now();
+    const loop = now => { const dt = Math.min(0.1, (now - last) / 1000); last = now; let n = tRef.current + dt * speedRef.current; if (n >= TOTAL) { tRef.current = TOTAL; setT(TOTAL); setPlaying(false); return; } tRef.current = n; setT(n); raf = requestAnimationFrame(loop); };
+    raf = requestAnimationFrame(loop); return () => cancelAnimationFrame(raf); }, [playing]);
+
+  // simulated narration track → optional real speech synthesis, one utterance per sentence
+  useEffect(() => { if (!ttsOK) return; try { window.speechSynthesis.cancel(); if (!tts || !playing) return; const u = new SpeechSynthesisUtterance(plain(SENTS[loc.gi].text)); u.rate = clamp(speed * 1.05, 0.5, 2); window.speechSynthesis.speak(u); } catch (e) {} }, [loc.gi, tts, playing]);
+  useEffect(() => () => { try { ttsOK && window.speechSynthesis.cancel(); } catch (e) {} }, []);
+
+  useEffect(() => { const onKey = e => { const tg = e.target, tag = tg && tg.tagName;
+      if (tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA' || (tg && tg.isContentEditable)) return;
+      if (e.code === 'Space' || e.key === 'k') { e.preventDefault(); toggleRef.current(); }
+      else if (e.key === 'ArrowRight') { e.preventDefault(); seek(tRef.current + 5); } else if (e.key === 'ArrowLeft') { e.preventDefault(); seek(tRef.current - 5); }
+      else if (e.key === 'c' || e.key === 'C') setCc(v => !v); else if (e.key === 'g' || e.key === 'G') setTags(v => !v);
+      else if (e.key === 'n' || e.key === 'N') jumpRef.current(1); else if (e.key === 'p' || e.key === 'P') jumpRef.current(-1);
+      else if (e.key === 'Escape') { setInfo(null); setSpeedMenu(false); } };
+    window.addEventListener('keydown', onKey); return () => window.removeEventListener('keydown', onKey); }, [seek]);
+  useEffect(() => { const f = () => setFs(!!document.fullscreenElement); document.addEventListener('fullscreenchange', f); return () => document.removeEventListener('fullscreenchange', f); }, []);
+  useEffect(() => { if (!speedMenu) return; const close = e => { if (!e.target.closest || !e.target.closest('.speed-wrap')) setSpeedMenu(false); }; document.addEventListener('pointerdown', close); return () => document.removeEventListener('pointerdown', close); }, [speedMenu]);
+
+  const onHot = h => { if (playing) { autoPaused.current = true; setPlaying(false); } else autoPaused.current = false; setInfo(h); };
+  const closeInfo = () => { setInfo(null); if (autoPaused.current) { autoPaused.current = false; setPlaying(true); } };
+  const toggleFs = async () => { try { if (document.fullscreenElement) await document.exitFullscreen(); else await playerRef.current.requestFullscreen(); } catch (e) {} };
+  const ch = CHAPTERS[loc.ci];
+
+  return (<div className="app">
+    <header className="flex flex-wrap items-end justify-between gap-3" style={{ marginBottom: 14 }}>
+      <div><p className="eyebrow">MET_ENG 5520 · Electron Microscopy · Interactive lecture</p><h1 className="title">EDS Motion Lab: how an X-ray spectrum is born</h1></div>
+      <div className="flex flex-wrap gap-3" aria-label="Signal color key">
+        {[['Primary e⁻', C.cyan], ['Bound e⁻', C.bound], ['Secondary e⁻', C.se], ['Backscattered e⁻', C.amber], ['Auger e⁻', C.auger], ['X-ray photon', C.mag]].map(([n, c]) => <span key={n} className="sig" style={{ color: c }}><i style={{ background: c }} /><span style={{ color: 'var(--muted)' }}>{n}</span></span>)}
+      </div>
+    </header>
+
+    <div className="grid gap-4" style={{ gridTemplateColumns: 'minmax(0,1fr)' }}>
+      <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] items-start">
+        <div className="flex flex-col gap-4" style={{ minWidth: 0 }}>
+          <div ref={playerRef} className="player">
+            <Stage t={t} P={P} tags={tags} onHot={onHot}>
+              {started && loc.lt < 2.9 && <div className="title-card" key={loc.ci}><div className="n">Chapter {loc.ci + 1} / {CHAPTERS.length}</div><div className="t">{ch.title}</div><div className="bar" style={{ background: ch.color }} /></div>}
+              {cc && started && <div className="cap-wrap"><Caption sent={SENTS[loc.gi]} sp={loc.sp} /></div>}
+              {started && !playing && !ended && !info && <div className="paused-badge">PAUSED · click anything that moves</div>}
+              {!started && <div className="poster"><div className="poster-inner">
+                <p className="eyebrow">6 chapters · {fmtTime(TOTAL)} · narrated</p>
+                <h2 className="disp" style={{ fontSize: 'clamp(20px,3.2vw,38px)', fontWeight: 600, lineHeight: 1.08, margin: '6px 0 14px', textWrap: 'balance' }}>From a single beam electron to a full EDS spectrum</h2>
+                <button className="bigplay" onClick={play} aria-label="Play video"><Icon name="Play" size={30} sw={2.4} /></button>
+                <p style={{ color: 'var(--muted)', marginTop: 14, fontSize: 'clamp(11px,1.2vw,13.5px)' }}>Click any moving particle to pause and read its physics. Change beam energy or element any time in Lab mode below.</p>
+              </div></div>}
+              {ended && <div className="poster"><div className="poster-inner"><p className="eyebrow">End of walkthrough</p><h2 className="disp" style={{ fontSize: 'clamp(18px,2.6vw,30px)', fontWeight: 600, margin: '6px 0 14px' }}>Try another element, then replay</h2>
+                <button className="bigplay" onClick={play} aria-label="Replay"><Icon name="RotateCcw" size={28} sw={2.4} /></button>
+                <div className="flex flex-wrap justify-center gap-2" style={{ marginTop: 14 }}>{CHAPTERS.map((c, i) => <button key={i} className="chip" style={{ color: c.color }} onClick={() => { seek(c.start + 0.01); setPlaying(true); }}>{i + 1} · {c.short}</button>)}</div></div></div>}
+            </Stage>
+            {info && <InfoCard h={info} P={P} onClose={closeInfo} />}
+            <div className="controls">
+              <Timeline t={t} onSeek={seek} />
+              <div className="flex items-center gap-1.5 flex-wrap" style={{ marginTop: 4 }}>
+                <button className="ibtn play" onClick={() => toggleRef.current()} aria-label={playing ? 'Pause' : 'Play'}><Icon name={playing ? 'Pause' : 'Play'} size={18} sw={2.4} /></button>
+                <button className="ibtn" onClick={() => jumpCh(-1)} aria-label="Previous chapter" title="Previous chapter (P)"><Icon name="SkipBack" size={17} /></button>
+                <button className="ibtn" onClick={() => seek(t - 5)} aria-label="Back 5 seconds" title="Back 5 s (←)"><Icon name="RotateCcw" size={16} /></button>
+                <button className="ibtn" onClick={() => seek(t + 5)} aria-label="Forward 5 seconds" title="Forward 5 s (→)"><Icon name="RotateCw" size={16} /></button>
+                <button className="ibtn" onClick={() => jumpCh(1)} disabled={loc.ci === CHAPTERS.length - 1} aria-label="Next chapter" title="Next chapter (N)"><Icon name="SkipForward" size={17} /></button>
+                <span className="mono" style={{ fontSize: 12.5, color: 'var(--muted)', marginLeft: 6 }}><span style={{ color: 'var(--text)' }}>{fmtTime(t)}</span> / {fmtTime(TOTAL)}</span>
+                <span className="hide-sm" style={{ marginLeft: 10, fontSize: 12.5, color: ch.color, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', maxWidth: 240 }}>{loc.ci + 1} · {ch.title}</span>
+                <div style={{ marginLeft: 'auto' }} className="flex items-center gap-1.5">
+                  <Waveform active={playing && started} t={t} />
+                  {ttsOK && <button className={`ibtn${tts ? ' on' : ''}`} onClick={() => setTts(v => !v)} aria-pressed={tts} aria-label="Spoken narration" title="Spoken narration (browser text-to-speech)"><Icon name={tts ? 'Volume2' : 'VolumeX'} size={17} /></button>}
+                  <button className={`ibtn${cc ? ' on' : ''}`} onClick={() => setCc(v => !v)} aria-pressed={cc} aria-label="Closed captions" title="Captions (C)"><Icon name="Captions" size={18} /></button>
+                  <button className={`ibtn${tags ? ' on' : ''}`} onClick={() => setTags(v => !v)} aria-pressed={tags} aria-label="Concept tags overlay" title="Concept tags (G)"><Icon name="Tag" size={16} /></button>
+                  <div className="relative speed-wrap">
+                    <button className="ibtn mono" style={{ width: 'auto', padding: '0 8px', fontSize: 12.5 }} onClick={() => setSpeedMenu(v => !v)} aria-haspopup="menu" aria-expanded={speedMenu} aria-label={`Playback speed ${speed}x`}><Icon name="Gauge" size={15} /> <span style={{ marginLeft: 4 }}>{speed}×</span></button>
+                    {speedMenu && <div className="menu" role="menu">{SPEEDS.map(s => <button key={s} role="menuitemradio" aria-checked={s === speed} className={s === speed ? 'on' : ''} onClick={() => { setSpeed(s); setSpeedMenu(false); }}><span>{s}×</span>{s === 1 && <span style={{ color: 'var(--faint)' }}>normal</span>}</button>)}</div>}
+                  </div>
+                  <button className="ibtn" onClick={toggleFs} aria-label={fs ? 'Exit full screen' : 'Full screen'}><Icon name={fs ? 'Minimize' : 'Maximize'} size={16} /></button>
+                </div>
+              </div>
+              <div className="chapter-row" style={{ marginTop: 8 }}>
+                {CHAPTERS.map((c, i) => <button key={i} className={`chip${loc.ci === i ? ' on' : ''}`} style={{ color: loc.ci === i ? c.color : undefined }} onClick={() => seek(c.start + 0.01)}><span className="mono" style={{ color: c.color }}>{i + 1}</span> {c.short} <span className="mono" style={{ color: 'var(--faint)' }}>{fmtTime(c.start)}</span></button>)}
+              </div>
+            </div>
+          </div>
+          <LabPanel params={params} set={setParams} ph={ph} spec={spec} onReset={() => setParams(DEFAULTS)} />
+          <p style={{ color: 'var(--faint)', fontSize: 12 }}>Keys: <span className="kbd">Space</span> play/pause · <span className="kbd">←</span><span className="kbd">→</span> 5 s · <span className="kbd">N</span>/<span className="kbd">P</span> chapter · <span className="kbd">C</span> captions · <span className="kbd">G</span> concept tags. Physics is simplified for teaching: Kanaya–Okayama range, Kramers continuum, Z⁴ fluorescence-yield model, Gaussian detector response.</p>
+        </div>
+        <div className="lg:sticky" style={{ top: 'calc(env(safe-area-inset-top, 0px) + 12px)' }}>
+          <ScriptPanel loc={loc} t={t} onJump={nt => { seek(nt); setInfo(null); }} follow={follow} setFollow={setFollow} />
+        </div>
+      </div>
+    </div>
+  </div>);
+}
+
+ReactDOM.createRoot(document.getElementById('root')).render(<App />);
+</script>
+
+</body></html>
